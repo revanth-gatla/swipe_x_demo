@@ -1,7 +1,8 @@
-from passlib.context import CryptContext
 from fastapi import FastAPI, HTTPException
 from database import get_db_connection
+from passlib.context import CryptContext
 from pydantic import EmailStr
+from auth import create_access_token
 
 app = FastAPI(title="SWIPE X API")
 pwd_context = CryptContext(
@@ -63,4 +64,46 @@ def register(name: str, email: EmailStr, password: str):
     return {
         "message": "Registration successful",
         "user_id": user_id
+    }
+
+@app.post("/login")
+def login(email: EmailStr, password: str):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        "SELECT id, password FROM users WHERE email = %s;",
+        (email,)
+    )
+
+    user = cursor.fetchone()
+
+    if not user:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    user_id = user[0]
+    stored_password = user[1]
+
+    if not pwd_context.verify(password, stored_password):
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    token = create_access_token(user_id)
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "message": "Login successful",
+        "access_token": token,
+        "token_type": "bearer"
     }
