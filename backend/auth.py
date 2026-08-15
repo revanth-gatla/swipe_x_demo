@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from jose import jwt
+from jose import jwt,JWTError  
 
 SECRET_KEY = "SWIPE_X_SECRET_KEY_CHANGE_LATER"
 ALGORITHM = "HS256"
@@ -17,3 +17,20 @@ def create_access_token(user_id: int):
     }
 
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        user_id = payload.get("user_id")
+
+        if user_id is None:
+            return None
+
+        return user_id
+
+    except JWTError:
+        return None
