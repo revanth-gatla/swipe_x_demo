@@ -495,3 +495,134 @@ def update_application_status(
         "application_id": application[0],
         "status": application[1]
     }
+@app.post("/jobs/{job_id}/save")
+def save_job(
+    job_id: int,
+    user_id: int = Depends(get_user_id)
+):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    # Check if job exists
+    cursor.execute(
+        "SELECT id FROM jobs WHERE id = %s;",
+        (job_id,)
+    )
+
+    job = cursor.fetchone()
+
+    if not job:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found"
+        )
+
+    # Check if already saved
+    cursor.execute(
+        """
+        SELECT id
+        FROM saved_jobs
+        WHERE user_id = %s AND job_id = %s;
+        """,
+        (user_id, job_id)
+    )
+
+    existing_save = cursor.fetchone()
+
+    if existing_save:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=409,
+            detail="Job already saved"
+        )
+
+    # Save job
+    cursor.execute(
+        """
+        INSERT INTO saved_jobs (user_id, job_id)
+        VALUES (%s, %s)
+        RETURNING id;
+        """,
+        (user_id, job_id)
+    )
+
+    saved_id = cursor.fetchone()[0]
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "message": "Job saved successfully",
+        "saved_id": saved_id
+    }
+@app.get("/saved-jobs")
+def get_saved_jobs(
+    user_id: int = Depends(get_user_id)
+):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT saved_jobs.id,
+               jobs.id,
+               jobs.title,
+               jobs.company,
+               jobs.location,
+               jobs.salary,
+               saved_jobs.saved_at
+        FROM saved_jobs
+        JOIN jobs
+        ON saved_jobs.job_id = jobs.id
+        WHERE saved_jobs.user_id = %s
+        ORDER BY saved_jobs.saved_at DESC;
+        """,
+        (user_id,)
+    )
+
+    saved_jobs = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return saved_jobs
+@app.delete("/jobs/{job_id}/save")
+def remove_saved_job(
+    job_id: int,
+    user_id: int = Depends(get_user_id)
+):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        DELETE FROM saved_jobs
+        WHERE user_id = %s AND job_id = %s
+        RETURNING id;
+        """,
+        (user_id, job_id)
+    )
+
+    saved_job = cursor.fetchone()
+
+    if not saved_job:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Saved job not found"
+        )
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "message": "Job removed from saved jobs"
+    }
