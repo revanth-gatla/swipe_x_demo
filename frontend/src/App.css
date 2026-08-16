@@ -1,0 +1,214 @@
+/* =========================================
+   SWIPE X - GLOBAL STYLES
+   ========================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: #0f0f17;
+  color: #f5f5f7;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* =========================================
+   APP
+   ========================================= */
+
+#root {
+  min-height: 100vh;
+}
+
+/* =========================================
+   DASHBOARD
+   ========================================= */
+
+.dashboard {
+  min-height: 100vh;
+  padding: 50px 40px 80px;
+}
+
+/* Hero */
+
+.dashboard-hero {
+  text-align: center;
+  margin: 20px auto 55px;
+  max-width: 900px;
+}
+
+.hero-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid #6c63ff;
+  border-radius: 30px;
+  color: #9b94ff;
+  background: rgba(108, 99, 255, 0.08);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-bottom: 20px;
+}
+
+.dashboard-hero h1 {
+  margin: 10px 0 15px;
+  font-size: 52px;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.dashboard-hero h1 span {
+  color: #8b7cff;
+}
+
+.dashboard-hero p {
+  margin: 0;
+  font-size: 19px;
+  color: #a7a7b5;
+}
+
+/* =========================================
+   DASHBOARD CARDS
+   ========================================= */
+
+.dashboard-grid {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.dashboard-card {
+  padding: 28px;
+
+  background: #181822;
+  border: 1px solid #29293a;
+  border-radius: 18px;
+
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-6px);
+  border-color: #756cff;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+}
+
+.card-icon {
+  width: 55px;
+  height: 55px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 18px;
+
+  border-radius: 14px;
+  background: rgba(117, 108, 255, 0.12);
+
+  font-size: 28px;
+}
+
+.dashboard-card h2 {
+  margin: 0 0 12px;
+  font-size: 21px;
+}
+
+.dashboard-card p {
+  min-height: 52px;
+  margin: 0;
+
+  color: #9c9cac;
+  line-height: 1.6;
+}
+
+.dashboard-card a {
+  display: inline-block;
+  margin-top: 18px;
+
+  color: #9b94ff;
+  text-decoration: none;
+  font-weight: 600;
+
+  transition: color 0.2s ease;
+}
+
+.dashboard-card a:hover {
+  color: #ffffff;
+}
+
+/* =========================================
+   RESPONSIVE DASHBOARD
+   ========================================= */
+
+@media (max-width: 1000px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .dashboard {
+    padding: 30px 20px 60px;
+  }
+
+  .dashboard-hero {
+    margin-bottom: 35px;
+  }
+
+  .dashboard-hero h1 {
+    font-size: 38px;
+  }
+
+  .dashboard-hero p {
+    font-size: 16px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================
+   SCROLLBAR
+   ========================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f0f17;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #363646;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #59596d;
+}

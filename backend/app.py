@@ -10,8 +10,22 @@ from fastapi import UploadFile, File
 from pypdf import PdfReader
 from groq import Groq
 import json
+from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
 
 app = FastAPI(title="SWIPE X API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 security = HTTPBearer()
 
