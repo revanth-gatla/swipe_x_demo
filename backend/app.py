@@ -2,12 +2,20 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from database import get_db_connection
 from passlib.context import CryptContext
-from pydantic import EmailStr,BaseModel
-from auth import create_access_token,verify_token
-
+from pydantic import EmailStr, BaseModel
+from auth import create_access_token, verify_token
+import os
+import shutil
+from fastapi import UploadFile, File
+from pypdf import PdfReader
+from groq import Groq
+import json
 
 app = FastAPI(title="SWIPE X API")
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 security = HTTPBearer()
+
+
 def get_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
@@ -22,6 +30,7 @@ def get_user_id(
 
     return user_id
 
+
 class ProfileRequest(BaseModel):
     phone: str
     location: str
@@ -29,6 +38,7 @@ class ProfileRequest(BaseModel):
     experience_years: int
     skills: str
     bio: str
+
 
 class JobRequest(BaseModel):
     title: str
@@ -41,14 +51,17 @@ class JobRequest(BaseModel):
     job_type: str
     application_url: str
 
+
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto"
 )
 
+
 @app.get("/")
 def home():
     return {"message": "SWIPE X Backend"}
+
 
 @app.get("/test-db")
 def test_db():
@@ -63,13 +76,17 @@ def test_db():
 
     return {"database": result[0]}
 
+
 @app.post("/register")
 def register(name: str, email: EmailStr, password: str):
     connection = get_db_connection()
     cursor = connection.cursor()
+
     cursor.execute(
         "SELECT id FROM users WHERE email = %s;",
-        (email,))
+        (email,)
+    )
+
     existing_user = cursor.fetchone()
 
     if existing_user:
@@ -81,6 +98,7 @@ def register(name: str, email: EmailStr, password: str):
         )
 
     hashed_password = pwd_context.hash(password)
+
     cursor.execute(
         """
         INSERT INTO users (name, email, password)
@@ -101,6 +119,7 @@ def register(name: str, email: EmailStr, password: str):
         "message": "Registration successful",
         "user_id": user_id
     }
+
 
 @app.post("/login")
 def login(email: EmailStr, password: str):
@@ -143,8 +162,13 @@ def login(email: EmailStr, password: str):
         "access_token": token,
         "token_type": "bearer"
     }
+
+
 @app.post("/profile")
-def create_profile(profile: ProfileRequest,user_id: int = Depends(get_user_id)):
+def create_profile(
+    profile: ProfileRequest,
+    user_id: int = Depends(get_user_id)
+):
     connection = get_db_connection()
     cursor = connection.cursor()
 
@@ -177,6 +201,8 @@ def create_profile(profile: ProfileRequest,user_id: int = Depends(get_user_id)):
         "message": "Profile created successfully",
         "profile_id": profile_id
     }
+
+
 @app.get("/profile")
 def get_profile(user_id: int = Depends(get_user_id)):
     connection = get_db_connection()
@@ -211,6 +237,8 @@ def get_profile(user_id: int = Depends(get_user_id)):
         "skills": profile[4],
         "bio": profile[5]
     }
+
+
 @app.put("/profile")
 def update_profile(
     profile: ProfileRequest,
@@ -261,6 +289,8 @@ def update_profile(
         "message": "Profile updated successfully",
         "profile_id": result[0]
     }
+
+
 @app.get("/jobs")
 def get_jobs():
     connection = get_db_connection()
@@ -282,6 +312,8 @@ def get_jobs():
     connection.close()
 
     return jobs
+
+
 @app.post("/jobs")
 def create_job(job: JobRequest):
     connection = get_db_connection()
@@ -319,6 +351,8 @@ def create_job(job: JobRequest):
         "message": "Job created successfully",
         "job_id": job_id
     }
+
+
 @app.get("/jobs/{job_id}")
 def get_job(job_id: int):
     connection = get_db_connection()
@@ -359,6 +393,8 @@ def get_job(job_id: int):
         "application_url": job[9],
         "created_at": job[10]
     }
+
+
 @app.post("/jobs/{job_id}/apply")
 def apply_for_job(
     job_id: int,
@@ -367,7 +403,6 @@ def apply_for_job(
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # 1. Check if job exists
     cursor.execute(
         "SELECT id FROM jobs WHERE id = %s;",
         (job_id,)
@@ -383,7 +418,6 @@ def apply_for_job(
             detail="Job not found"
         )
 
-    # 2. Check if user already applied
     cursor.execute(
         """
         SELECT id
@@ -403,7 +437,6 @@ def apply_for_job(
             detail="Already applied for this job"
         )
 
-    # 3. Create application
     cursor.execute(
         """
         INSERT INTO applications (user_id, job_id)
@@ -415,7 +448,6 @@ def apply_for_job(
 
     application_id = cursor.fetchone()[0]
 
-    # 4. Save changes
     connection.commit()
 
     cursor.close()
@@ -425,6 +457,7 @@ def apply_for_job(
         "message": "Application submitted successfully",
         "application_id": application_id
     }
+
 
 @app.get("/applications")
 def get_my_applications(
@@ -456,6 +489,8 @@ def get_my_applications(
     connection.close()
 
     return applications
+
+
 @app.put("/applications/{application_id}/status")
 def update_application_status(
     application_id: int,
@@ -495,6 +530,8 @@ def update_application_status(
         "application_id": application[0],
         "status": application[1]
     }
+
+
 @app.post("/jobs/{job_id}/save")
 def save_job(
     job_id: int,
@@ -503,7 +540,6 @@ def save_job(
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # Check if job exists
     cursor.execute(
         "SELECT id FROM jobs WHERE id = %s;",
         (job_id,)
@@ -519,7 +555,6 @@ def save_job(
             detail="Job not found"
         )
 
-    # Check if already saved
     cursor.execute(
         """
         SELECT id
@@ -539,7 +574,6 @@ def save_job(
             detail="Job already saved"
         )
 
-    # Save job
     cursor.execute(
         """
         INSERT INTO saved_jobs (user_id, job_id)
@@ -560,6 +594,8 @@ def save_job(
         "message": "Job saved successfully",
         "saved_id": saved_id
     }
+
+
 @app.get("/saved-jobs")
 def get_saved_jobs(
     user_id: int = Depends(get_user_id)
@@ -591,6 +627,8 @@ def get_saved_jobs(
     connection.close()
 
     return saved_jobs
+
+
 @app.delete("/jobs/{job_id}/save")
 def remove_saved_job(
     job_id: int,
@@ -626,3 +664,448 @@ def remove_saved_job(
     return {
         "message": "Job removed from saved jobs"
     }
+
+
+@app.post("/resume/upload")
+def upload_resume(
+    file: UploadFile = File(...),
+    user_id: int = Depends(get_user_id)
+):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    os.makedirs("resumes", exist_ok=True)
+
+    file_path = f"resumes/{file.filename}"
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    cursor.execute(
+        """
+        INSERT INTO resumes (user_id, file_name, file_path)
+        VALUES (%s, %s, %s)
+        RETURNING id;
+        """,
+        (user_id, file.filename, file_path)
+    )
+
+    resume_id = cursor.fetchone()[0]
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "message": "Resume uploaded successfully",
+        "resume_id": resume_id,
+        "file_name": file.filename
+    }
+
+
+@app.post("/resume/parse")
+def parse_resume(
+    user_id: int = Depends(get_user_id)
+):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, file_path
+        FROM resumes
+        WHERE user_id = %s
+        ORDER BY uploaded_at DESC
+        LIMIT 1;
+        """,
+        (user_id,)
+    )
+
+    resume = cursor.fetchone()
+
+    if not resume:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found"
+        )
+
+    resume_id = resume[0]
+    file_path = resume[1]
+
+    reader = PdfReader(file_path)
+
+    extracted_text = ""
+
+    for page in reader.pages:
+        extracted_text += page.extract_text() or ""
+
+    cursor.execute(
+        """
+        UPDATE resumes
+        SET extracted_text = %s
+        WHERE id = %s;
+        """,
+        (extracted_text, resume_id)
+    )
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "message": "Resume parsed successfully",
+        "resume_id": resume_id,
+        "extracted_text": extracted_text
+    }
+
+
+@app.post("/resume/extract")
+def extract_resume_details(
+    user_id: int = Depends(get_user_id)
+):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, extracted_text
+        FROM resumes
+        WHERE user_id = %s
+        ORDER BY uploaded_at DESC
+        LIMIT 1;
+        """,
+        (user_id,)
+    )
+
+    resume = cursor.fetchone()
+
+    if not resume:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found"
+        )
+
+    resume_id = resume[0]
+    resume_text = resume[1]
+
+    if not resume_text:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Resume has not been parsed yet"
+        )
+
+    prompt = f"""
+    Analyze this resume and extract:
+
+    1. Skills
+    2. Work experience
+
+    Return ONLY valid JSON:
+
+    {{
+        "skills": ["skill1", "skill2"],
+        "experience": "experience details"
+    }}
+
+    Resume:
+    {resume_text}
+    """
+
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=0
+    )
+
+    ai_result = response.choices[0].message.content
+    print("AI RESULT:", repr(ai_result))
+
+    if not ai_result or not ai_result.strip():
+        raise HTTPException(
+            status_code=500,
+            detail="AI returned an empty response"
+        )
+
+    ai_result = ai_result.strip()
+    if ai_result.startswith("```"):
+        ai_result = ai_result.replace("```json", "", 1)
+        ai_result = ai_result.replace("```", "", 1)
+        ai_result = ai_result.strip()
+#json load
+    extracted_data = json.loads(ai_result)
+
+    skills = extracted_data["skills"]
+    experience = extracted_data["experience"]
+
+    cursor.execute(
+        """
+        UPDATE resumes
+        SET extracted_skills = %s,
+            extracted_experience = %s
+        WHERE id = %s;
+        """,
+        (
+            ", ".join(skills),
+            experience,
+            resume_id
+        )
+    )
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "message": "Resume details extracted successfully",
+        "skills": skills,
+        "experience": experience
+    }
+
+
+@app.post("/resume/ats")
+def analyze_ats(
+    user_id: int = Depends(get_user_id)
+):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, extracted_text
+        FROM resumes
+        WHERE user_id = %s
+        ORDER BY uploaded_at DESC
+        LIMIT 1;
+        """,
+        (user_id,)
+    )
+
+    resume = cursor.fetchone()
+
+    if not resume:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found"
+        )
+
+    resume_id = resume[0]
+    resume_text = resume[1]
+
+    if not resume_text:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Resume has not been parsed yet"
+        )
+
+    prompt = f"""
+    Analyze the following resume for ATS compatibility.
+
+    Give an ATS score from 0 to 100.
+
+    Consider:
+    - Skills
+    - Work experience
+    - Education
+    - Keywords
+    - Resume content
+    - Overall relevance
+
+    Return ONLY a number between 0 and 100.
+
+    Resume:
+    {resume_text}
+    """
+
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=0
+    )
+
+    ai_result = response.choices[0].message.content.strip()
+
+    try:
+        ats_score = int(ai_result)
+    except ValueError:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=500,
+            detail="AI returned an invalid ATS score"
+        )
+
+    if ats_score < 0 or ats_score > 100:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=500,
+            detail="Invalid ATS score"
+        )
+
+    cursor.execute(
+        """
+        UPDATE resumes
+        SET ats_score = %s
+        WHERE id = %s;
+        """,
+        (ats_score, resume_id)
+    )
+
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    return {
+        "message": "ATS analysis completed",
+        "resume_id": resume_id,
+        "ats_score": ats_score
+    }
+
+
+@app.get("/recommended-jobs")
+def get_recommended_jobs(
+    user_id: int = Depends(get_user_id)
+):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT extracted_skills, extracted_experience
+        FROM resumes
+        WHERE user_id = %s
+        ORDER BY uploaded_at DESC
+        LIMIT 1;
+        """,
+        (user_id,)
+    )
+
+    resume = cursor.fetchone()
+
+    if not resume:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Resume not found"
+        )
+
+    skills = resume[0]
+    experience = resume[1]
+
+    if not skills:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Resume skills have not been extracted yet"
+        )
+
+    cursor.execute(
+        """
+        SELECT id, title, company, location,
+               required_skills, experience_required
+        FROM jobs
+        ORDER BY created_at DESC;
+        """
+    )
+
+    jobs = cursor.fetchall()
+
+    if not jobs:
+        cursor.close()
+        connection.close()
+        raise HTTPException(
+            status_code=404,
+            detail="No jobs available"
+        )
+
+    job_data = []
+
+    for job in jobs:
+        job_data.append({
+            "id": job[0],
+            "title": job[1],
+            "company": job[2],
+            "location": job[3],
+            "required_skills": job[4],
+            "experience_required": job[5]
+        })
+
+    prompt = f"""
+    Match this candidate with the available jobs.
+
+    Candidate skills:
+    {skills}
+
+    Candidate experience:
+    {experience}
+
+    Available jobs:
+    {job_data}
+
+    Rank the jobs from best match to lowest match.
+
+    Return ONLY valid JSON in this format:
+
+    {{
+        "recommendations": [
+            {{
+                "job_id": 1,
+                "match_score": 90
+            }}
+        ]
+    }}
+
+    Match score must be between 0 and 100.
+    """
+
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=0,
+        response_format={"type": "json_object"}
+    )
+
+    ai_result = response.choices[0].message.content.strip()
+    if ai_result.startswith("```"):
+        ai_result = ai_result.replace("```json", "", 1)
+        ai_result = ai_result.replace("```", "", 1)
+        ai_result = ai_result.strip()
+
+#json load
+    recommendations = json.loads(ai_result)
+
+    cursor.close()
+    connection.close()
+
+    return recommendations
