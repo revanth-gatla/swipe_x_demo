@@ -6,16 +6,29 @@ from pydantic import EmailStr, BaseModel
 from auth import create_access_token, verify_token
 import os
 import shutil
+import uuid
+import fitz
 from fastapi import UploadFile, File
 from pypdf import PdfReader
 from groq import Groq
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+import re
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent
+ENV_FILE = BASE_DIR / ".env"
+
+load_dotenv(ENV_FILE, override=True)
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    raise RuntimeError("GROQ_API_KEY not found in backend/.env")
 
 app = FastAPI(title="SWIPE X API")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -26,7 +39,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+client = Groq(api_key=GROQ_API_KEY)
 security = HTTPBearer()
 
 
@@ -141,7 +155,7 @@ def login(email: EmailStr, password: str):
     cursor = connection.cursor()
 
     cursor.execute(
-        "SELECT id, password FROM users WHERE email = %s;",
+        "SELECT id, name, password FROM users WHERE email = %s;",
         (email,)
     )
 
@@ -156,7 +170,8 @@ def login(email: EmailStr, password: str):
         )
 
     user_id = user[0]
-    stored_password = user[1]
+    name = user[1]
+    stored_password = user[2]
 
     if not pwd_context.verify(password, stored_password):
         cursor.close()
@@ -174,7 +189,8 @@ def login(email: EmailStr, password: str):
     return {
         "message": "Login successful",
         "access_token": token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "name": name
     }
 
 
@@ -688,34 +704,52 @@ def upload_resume(
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    os.makedirs("resumes", exist_ok=True)
+    try:
+        os.makedirs("resumes", exist_ok=True)
 
-    file_path = f"resumes/{file.filename}"
+        original_filename = file.filename
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        extension = os.path.splitext(original_filename)[1]
+        unique_filename = f"{uuid.uuid4().hex}{extension}"
 
-    cursor.execute(
-        """
-        INSERT INTO resumes (user_id, file_name, file_path)
-        VALUES (%s, %s, %s)
-        RETURNING id;
-        """,
-        (user_id, file.filename, file_path)
-    )
+        file_path = os.path.join("resumes", unique_filename)
 
-    resume_id = cursor.fetchone()[0]
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    connection.commit()
+        cursor.execute(
+            """
+            INSERT INTO resumes (user_id, file_name, file_path)
+            VALUES (%s, %s, %s)
+            RETURNING id;
+            """,
+            (user_id, original_filename, file_path)
+        )
 
-    cursor.close()
-    connection.close()
+        resume_id = cursor.fetchone()[0]
 
-    return {
-        "message": "Resume uploaded successfully",
-        "resume_id": resume_id,
-        "file_name": file.filename
-    }
+        connection.commit()
+
+        return {
+            "message": "Resume uploaded successfully",
+            "resume_id": resume_id,
+            "file_name": original_filename
+        }
+
+    except Exception as e:
+        connection.rollback()
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Resume upload failed: {str(e)}"
+        )
+
+    finally:
+        cursor.close()
+        connection.close()
 
 
 @app.post("/resume/parse")
@@ -749,12 +783,13 @@ def parse_resume(
     resume_id = resume[0]
     file_path = resume[1]
 
-    reader = PdfReader(file_path)
-
+    pdf = fitz.open(file_path)
     extracted_text = ""
 
-    for page in reader.pages:
-        extracted_text += page.extract_text() or ""
+    for page in pdf:
+        extracted_text += page.get_text()
+
+    pdf.close()
 
     cursor.execute(
         """
@@ -834,7 +869,7 @@ def extract_resume_details(
     """
 
     response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="openai/gpt-oss-20b",
         messages=[
             {
                 "role": "user",
@@ -845,7 +880,6 @@ def extract_resume_details(
     )
 
     ai_result = response.choices[0].message.content
-    print("AI RESULT:", repr(ai_result))
 
     if not ai_result or not ai_result.strip():
         raise HTTPException(
@@ -854,11 +888,12 @@ def extract_resume_details(
         )
 
     ai_result = ai_result.strip()
+
     if ai_result.startswith("```"):
         ai_result = ai_result.replace("```json", "", 1)
         ai_result = ai_result.replace("```", "", 1)
         ai_result = ai_result.strip()
-#json load
+
     extracted_data = json.loads(ai_result)
 
     skills = extracted_data["skills"]
@@ -949,7 +984,7 @@ def analyze_ats(
     """
 
     response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="openai/gpt-oss-20b",
         messages=[
             {
                 "role": "user",
@@ -1028,10 +1063,10 @@ def get_recommended_jobs(
             detail="Resume not found"
         )
 
-    skills = resume[0]
-    experience = resume[1]
+    candidate_skills = resume[0]
+    candidate_experience = resume[1] or ""
 
-    if not skills:
+    if not candidate_skills:
         cursor.close()
         connection.close()
         raise HTTPException(
@@ -1039,11 +1074,30 @@ def get_recommended_jobs(
             detail="Resume skills have not been extracted yet"
         )
 
+    candidate_skill_list = [
+        skill.strip().lower()
+        for skill in candidate_skills.split(",")
+        if skill.strip()
+    ]
+
+    experience_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?)",
+        candidate_experience.lower()
+    )
+
+    candidate_years = (
+        float(experience_match.group(1))
+        if experience_match
+        else 0
+    )
+
     cursor.execute(
         """
         SELECT id, title, company, location,
-               required_skills, experience_required
-        FROM jobs
+               description, required_skills,
+               experience_required, salary,
+               job_type, application_url
+        FROM jobs WHERE company='Dataset Test Company'
         ORDER BY created_at DESC;
         """
     )
@@ -1058,68 +1112,117 @@ def get_recommended_jobs(
             detail="No jobs available"
         )
 
-    job_data = []
+    recommendations = []
 
     for job in jobs:
-        job_data.append({
-            "id": job[0],
-            "title": job[1],
-            "company": job[2],
-            "location": job[3],
-            "required_skills": job[4],
-            "experience_required": job[5]
+        (
+            job_id,
+            title,
+            company,
+            location,
+            description,
+            required_skills,
+            experience_required,
+            salary,
+            job_type,
+            application_url
+        ) = job
+
+        required_skill_list = [
+            skill.strip().lower()
+            for skill in (required_skills or "").split(",")
+            if skill.strip()
+        ]
+
+        if not required_skill_list:
+            skill_score = 0
+            matched_skills = []
+            missing_skills = []
+        else:
+            matched_skills = [
+                skill
+                for skill in required_skill_list
+                if any(
+                    skill == candidate_skill
+                    or skill in candidate_skill
+                    or candidate_skill in skill
+                    for candidate_skill in candidate_skill_list
+                )
+            ]
+
+            missing_skills = [
+                skill
+                for skill in required_skill_list
+                if skill not in matched_skills
+            ]
+
+            skill_score = (
+                len(matched_skills) /
+                len(required_skill_list)
+            ) * 70
+
+        required_years = float(experience_required or 0)
+
+        if required_years == 0:
+            experience_score = 20
+        elif candidate_years >= required_years:
+            experience_score = 20
+        elif candidate_years > 0:
+            experience_score = (
+                candidate_years / required_years
+            ) * 20
+        else:
+            experience_score = 0
+
+        text = (
+            f"{title or ''} "
+            f"{description or ''}"
+        ).lower()
+
+        role_relevance = 0
+
+        for candidate_skill in candidate_skill_list:
+            if candidate_skill in text:
+                role_relevance += 1
+
+        role_score = min(role_relevance * 2, 10)
+
+        match_score = round(
+            min(
+                skill_score +
+                experience_score +
+                role_score,
+                100
+            )
+        )
+
+        recommendations.append({
+            "job_id": job_id,
+            "title": title,
+            "company": company,
+            "location": location,
+            "salary": salary,
+            "job_type": job_type,
+            "application_url": application_url,
+            "match_score": match_score,
+            "matched_skills": matched_skills,
+            "missing_skills": missing_skills,
+            "experience_match": candidate_years >= required_years
         })
 
-    prompt = f"""
-    Match this candidate with the available jobs.
-
-    Candidate skills:
-    {skills}
-
-    Candidate experience:
-    {experience}
-
-    Available jobs:
-    {job_data}
-
-    Rank the jobs from best match to lowest match.
-
-    Return ONLY valid JSON in this format:
-
-    {{
-        "recommendations": [
-            {{
-                "job_id": 1,
-                "match_score": 90
-            }}
-        ]
-    }}
-
-    Match score must be between 0 and 100.
-    """
-
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        temperature=0,
-        response_format={"type": "json_object"}
+    recommendations.sort(
+        key=lambda job: job["match_score"],
+        reverse=True
     )
-
-    ai_result = response.choices[0].message.content.strip()
-    if ai_result.startswith("```"):
-        ai_result = ai_result.replace("```json", "", 1)
-        ai_result = ai_result.replace("```", "", 1)
-        ai_result = ai_result.strip()
-
-#json load
-    recommendations = json.loads(ai_result)
 
     cursor.close()
     connection.close()
 
-    return recommendations
+    return {
+        "candidate": {
+            "skills": candidate_skill_list,
+            "experience_years": candidate_years
+        },
+        "recommendations": recommendations
+    }
+

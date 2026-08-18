@@ -1,103 +1,272 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import API from "../services/api";
 
 function SavedJobs() {
   const [savedJobs, setSavedJobs] = useState([]);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [applyingJobId, setApplyingJobId] = useState(null);
+  const [removingJobId, setRemovingJobId] = useState(null);
 
-  useEffect(() => {
-    loadSavedJobs();
-  }, []);
-
-  const loadSavedJobs = async () => {
+  const fetchSavedJobs = async () => {
     try {
+      setError("");
+
       const response = await API.get("/saved-jobs");
-      setSavedJobs(response.data);
-    } catch (error) {
+
+      const data = response.data || [];
+
+      setSavedJobs(
+        data.map((job) => ({
+          savedId: job[0],
+          jobId: job[1],
+          title: job[2],
+          company: job[3],
+          location: job[4],
+          salary: job[5],
+          savedAt: job[6],
+        }))
+      );
+    } catch (err) {
       setError(
-        error.response?.data?.detail ||
-        "Unable to load saved jobs"
+        err.response?.data?.detail ||
+          "Unable to load saved jobs."
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const removeSavedJob = async (jobId) => {
+  useEffect(() => {
+    fetchSavedJobs();
+  }, []);
+
+  const applyForJob = async (jobId) => {
     try {
+      setError("");
+      setApplyingJobId(jobId);
+
+      await API.post(`/jobs/${jobId}/apply`);
+
       await API.delete(`/jobs/${jobId}/save`);
 
-      setSavedJobs(
-        savedJobs.filter((job) => job[1] !== jobId)
+      setSavedJobs((current) =>
+        current.filter(
+          (job) => job.jobId !== jobId
+        )
       );
-    } catch (error) {
+    } catch (err) {
       setError(
-        error.response?.data?.detail ||
-        "Unable to remove saved job"
+        err.response?.data?.detail ||
+          "Unable to apply for this job."
       );
+    } finally {
+      setApplyingJobId(null);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="page-container">
-        <h1>Saved Jobs</h1>
-        <p>Loading saved jobs...</p>
-      </div>
+  const removeSavedJob = async (jobId) => {
+    try {
+      setError("");
+      setRemovingJobId(jobId);
+
+      await API.delete(`/jobs/${jobId}/save`);
+
+      setSavedJobs((current) =>
+        current.filter(
+          (job) => job.jobId !== jobId
+        )
+      );
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          "Unable to remove saved job."
+      );
+    } finally {
+      setRemovingJobId(null);
+    }
+  };
+
+  const formatDate = (date) => {
+    if (!date) {
+      return "Recently";
+    }
+
+    return new Date(date).toLocaleDateString(
+      "en-IN",
+      {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }
     );
-  }
+  };
 
   return (
-    <div className="page-container">
-      <h1>Saved Jobs</h1>
+    <div className="saved-jobs-page">
+
+      <div className="saved-jobs-header">
+
+        <div>
+          <p className="page-label">
+            SAVED JOBS
+          </p>
+
+          <h1>
+            Saved Jobs
+          </h1>
+
+          <p className="page-description">
+            Jobs you've saved for later.
+          </p>
+        </div>
+
+        <div className="saved-jobs-count">
+
+          <strong>
+            {savedJobs.length}
+          </strong>
+
+          <span>
+            Saved
+          </span>
+
+        </div>
+
+      </div>
 
       {error && (
-        <p className="error">
+        <div className="saved-jobs-error">
           {error}
-        </p>
+        </div>
       )}
 
-      {!error && savedJobs.length === 0 && (
-        <p>No saved jobs yet.</p>
+      {loading && (
+        <div className="saved-jobs-empty">
+
+          <div className="saved-loader"></div>
+
+          <h2>
+            Loading saved jobs...
+          </h2>
+
+          <p>
+            Fetching your saved opportunities.
+          </p>
+
+        </div>
       )}
 
-      <div className="jobs-grid">
-        {savedJobs.map((job) => (
-          <div
-            className="job-card"
-            key={job[0]}
-          >
-            <h2>{job[2]}</h2>
+      {!loading &&
+        !error &&
+        savedJobs.length === 0 && (
+          <div className="saved-jobs-empty">
+
+            <div className="saved-empty-icon">
+              🔖
+            </div>
+
+            <h2>
+              No saved jobs yet
+            </h2>
 
             <p>
-              <strong>Company:</strong>{" "}
-              {job[3]}
+              Drag a job card down in AI Job
+              Matching to save it for later.
             </p>
 
-            <p>
-              <strong>Location:</strong>{" "}
-              {job[4]}
-            </p>
-
-            <p>
-              <strong>Salary:</strong>{" "}
-              {job[5]}
-            </p>
-
-            <Link to={`/jobs/${job[1]}`}>
-              View Job
-            </Link>
-
-            <button
-              onClick={() => removeSavedJob(job[1])}
-            >
-              Remove
-            </button>
           </div>
-        ))}
-      </div>
+        )}
+
+      {!loading &&
+        savedJobs.length > 0 && (
+          <div className="saved-jobs-list">
+
+            {savedJobs.map((job) => (
+              <div
+                className="saved-job-card"
+                key={job.savedId}
+              >
+
+                <div className="saved-company-logo">
+                  {job.company
+                    ?.charAt(0)
+                    ?.toUpperCase() || "C"}
+                </div>
+
+                <div className="saved-job-main">
+
+                  <h2>
+                    {job.title}
+                  </h2>
+
+                  <p className="saved-company">
+                    {job.company}
+                  </p>
+
+                  <div className="saved-job-meta">
+
+                    <span>
+                      📍{" "}
+                      {job.location ||
+                        "Location not specified"}
+                    </span>
+
+                    {job.salary && (
+                      <span>
+                        💰 {job.salary}
+                      </span>
+                    )}
+
+                    <span>
+                      🔖 Saved{" "}
+                      {formatDate(job.savedAt)}
+                    </span>
+
+                  </div>
+
+                </div>
+
+                <div className="saved-job-actions">
+
+                  <button
+                    className="apply-saved-button"
+                    onClick={() =>
+                      applyForJob(job.jobId)
+                    }
+                    disabled={
+                      applyingJobId === job.jobId ||
+                      removingJobId === job.jobId
+                    }
+                  >
+                    {applyingJobId === job.jobId
+                      ? "Applying..."
+                      : "Apply"}
+                  </button>
+
+                  <button
+                    className="remove-saved-button"
+                    onClick={() =>
+                      removeSavedJob(job.jobId)
+                    }
+                    disabled={
+                      applyingJobId === job.jobId ||
+                      removingJobId === job.jobId
+                    }
+                  >
+                    {removingJobId === job.jobId
+                      ? "Removing..."
+                      : "Remove"}
+                  </button>
+
+                </div>
+
+              </div>
+            ))}
+
+          </div>
+        )}
+
     </div>
   );
 }

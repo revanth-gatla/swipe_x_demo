@@ -1,82 +1,156 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import API from "../services/api";
+import axios from "axios";
+
+const API_URL = "http://127.0.0.1:8000";
 
 function Login() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async (event) => {
     event.preventDefault();
+
     setError("");
+    setLoading(true);
 
     try {
-      const response = await API.post("/login", null, {
-        params: {
-          email: email,
-          password: password,
-        },
-      });
+      const response = await axios.post(
+        `${API_URL}/login`,
+        null,
+        {
+          params: {
+            email,
+            password,
+          },
+        }
+      );
 
-      // Store JWT using the same key expected by api.js
       localStorage.setItem(
-        "token",
+        "access_token",
         response.data.access_token
       );
 
-      navigate("/dashboard");
-    } catch (error) {
-      setError(
-        error.response?.data?.detail ||
-        "Login failed"
+      localStorage.setItem(
+        "username",
+        response.data.name
       );
+
+      navigate("/dashboard");
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          "Login failed. Please check your credentials."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="auth-container">
+    <div className="auth-page">
+
       <div className="auth-card">
-        <h1>SWIPE X</h1>
-        <h2>Candidate Login</h2>
 
-        <form onSubmit={handleLogin}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
+        <div className="brand-mark">
+          SX
+        </div>
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
+        <h1>
+          Welcome to SWIPE X
+        </h1>
 
-          <button type="submit">
-            Login
-          </button>
-        </form>
+        <p className="auth-subtitle">
+          Discover opportunities that match you.
+        </p>
 
         {error && (
-          <p className="error">
+          <div className="error-message">
             {error}
-          </p>
+          </div>
         )}
 
-        <p>
+        <form onSubmit={handleLogin}>
+
+          <label>
+            Email
+          </label>
+
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(event) =>
+              setEmail(event.target.value)
+            }
+            required
+          />
+
+          <label>
+            Password
+          </label>
+
+          <div className="password-container">
+
+            <input
+              type={
+                showPassword
+                  ? "text"
+                  : "password"
+              }
+              placeholder="Enter your password"
+              value={password}
+              onChange={(event) =>
+                setPassword(event.target.value)
+              }
+              required
+            />
+
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() =>
+                setShowPassword(
+                  (current) => !current
+                )
+              }
+              aria-label={
+                showPassword
+                  ? "Hide password"
+                  : "Show password"
+              }
+            >
+              {showPassword ? "◉" : "◌"}
+            </button>
+
+          </div>
+
+          <button
+            type="submit"
+            className="auth-button"
+            disabled={loading}
+          >
+            {loading
+              ? "Logging in..."
+              : "Login"}
+          </button>
+
+        </form>
+
+        <p className="auth-footer">
           Don't have an account?{" "}
           <Link to="/register">
-            Register
+            Create one
           </Link>
         </p>
+
       </div>
+
     </div>
   );
 }
