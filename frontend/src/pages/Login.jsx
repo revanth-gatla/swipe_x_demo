@@ -22,12 +22,9 @@ function Login() {
     try {
       const response = await axios.post(
         `${API_URL}/login`,
-        null,
         {
-          params: {
-            email,
-            password,
-          },
+          email: email.trim(),
+          password,
         }
       );
 
@@ -45,7 +42,7 @@ function Login() {
     } catch (err) {
       setError(
         err.response?.data?.detail ||
-          "Login failed. Please check your credentials."
+        "Login failed. Please check your credentials."
       );
     } finally {
       setLoading(false);
@@ -61,9 +58,7 @@ function Login() {
           SX
         </div>
 
-        <h1>
-          Welcome to SWIPE X
-        </h1>
+        <h1>Welcome to SWIPE X</h1>
 
         <p className="auth-subtitle">
           Discover opportunities that match you.
@@ -77,9 +72,7 @@ function Login() {
 
         <form onSubmit={handleLogin}>
 
-          <label>
-            Email
-          </label>
+          <label>Email</label>
 
           <input
             type="email"
@@ -91,9 +84,7 @@ function Login() {
             required
           />
 
-          <label>
-            Password
-          </label>
+          <label>Password</label>
 
           <div className="password-container">
 
@@ -144,6 +135,7 @@ function Login() {
 
         <p className="auth-footer">
           Don't have an account?{" "}
+
           <Link to="/register">
             Create one
           </Link>
