@@ -47,12 +47,9 @@ function Dashboard() {
       icon: "🔖",
       path: "/saved-jobs",
     },
-    {
-      title: "Discover Jobs",
-      description: "Explore available opportunities",
-      icon: "🔍",
-      path: "/jobs",
-    },
+    
+      
+    
   ];
 
   const username =

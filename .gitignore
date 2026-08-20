@@ -225,3 +225,28 @@ venv/
 .venv/
 node_modules/
 dist/
+swipe_x_backup.sql
+
+
+# Environment variables / secrets
+.env
+*.env
+backend/.env
+frontend/.env
+
+# Database backups
+*.sql
+swipe_x_backup.sql
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/
+frontend/dist/
+
+# Docker
+*.log

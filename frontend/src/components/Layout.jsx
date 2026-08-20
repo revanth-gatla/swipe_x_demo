@@ -17,7 +17,7 @@ function Layout() {
     { path: "/ai-matches", label: "AI Matches" },
     { path: "/applications", label: "Applications" },
     { path: "/saved-jobs", label: "Saved Jobs" },
-    { path: "/jobs", label: "Discover Jobs" },
+    
   ];
 
   const username =

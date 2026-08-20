@@ -1,7 +1,16 @@
+import os
 from datetime import datetime, timedelta, timezone
-from jose import jwt,JWTError  
 
-SECRET_KEY = "SWIPE_X_SECRET_KEY_CHANGE_LATER"
+from dotenv import load_dotenv
+from jose import JWTError, jwt
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY not found in backend/.env")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -16,7 +25,13 @@ def create_access_token(user_id: int):
         "exp": expire
     }
 
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(
+        payload,
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+
 def verify_token(token: str):
     try:
         payload = jwt.decode(
