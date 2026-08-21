@@ -1,4 +1,4 @@
-# SWIPE X – Candidate Workflow
+```# SWIPE X – Candidate Workflow
 
 ## 1. Overview
 
@@ -213,4 +213,4 @@ MAIN CANDIDATE APIS(BACKEND):
 
 
 
-####The main purpose of the Candidate Workflow is to provide a simple AI-powered, swipe-based job discovery and application experience.
+####The main purpose of the Candidate Workflow is to provide a simple AI-powered, swipe-based job discovery and application experience.```
