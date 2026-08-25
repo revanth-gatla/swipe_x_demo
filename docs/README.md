@@ -497,7 +497,6 @@ Frontend + Backend + Database
 Open localhost URL
        ↓
 SwipeX Application
-```
-```
+
 
 
