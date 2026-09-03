@@ -250,3 +250,6 @@ frontend/dist/
 
 # Docker
 *.log
+
+# Dataset files (large CSVs)
+backend/data/

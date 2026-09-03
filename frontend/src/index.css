@@ -1027,3 +1027,456 @@ button {
   }
 
 }
+
+/* ==========================================================================
+   SWIPE X ENHANCEMENTS: QUICK ACTIONS, ATS REPORT, HISTORY & SKILL CHIPS
+   ========================================================================== */
+
+/* JOB SNIPPET */
+.job-snippet {
+  margin: 14px 0 16px;
+}
+
+.job-snippet p {
+  color: #5c5568;
+  font-size: 13.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* QUICK SWIPE BUTTONS ON CARD */
+.card-quick-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #eeeaf2;
+}
+
+.quick-action-btn {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1.5px solid transparent;
+}
+
+.quick-action-btn.btn-left {
+  background: #fff3f3;
+  color: #dc2626;
+  border-color: #ffd2d2;
+}
+.quick-action-btn.btn-left:hover {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25);
+}
+
+.quick-action-btn.btn-save {
+  background: #f4f3f6;
+  color: #4b4457;
+  border-color: #e2dfe7;
+}
+.quick-action-btn.btn-save:hover {
+  background: #4b4457;
+  color: #ffffff;
+  border-color: #4b4457;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(75, 68, 87, 0.2);
+}
+
+.quick-action-btn.btn-right {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+.quick-action-btn.btn-right:hover {
+  background: #059669;
+  color: #ffffff;
+  border-color: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.25);
+}
+
+/* CLICKABLE SWIPE HINT INSTRUCTIONS */
+.swipe-direction.clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.swipe-direction.clickable:hover {
+  transform: scale(1.05);
+}
+
+/* ATS TRIGGER & INLINE REPORT */
+.ats-trigger-section {
+  margin-top: 18px;
+}
+
+.ats-analyze-btn {
+  width: 100%;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #6544ef 0%, #8757ff 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 15px rgba(101, 68, 239, 0.25);
+}
+
+.ats-analyze-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(101, 68, 239, 0.35);
+}
+
+.ats-analyze-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.inline-ats-report {
+  background: #fbf9ff;
+  border: 1.5px solid #dcd3fc;
+  border-radius: 16px;
+  padding: 20px;
+  margin-top: 10px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.inline-ats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.inline-ats-header h4 {
+  margin: 0;
+  color: #382d54;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.close-ats-btn {
+  background: none;
+  border: none;
+  color: #8a8198;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.close-ats-btn:hover {
+  background: #ede9f6;
+  color: #382d54;
+}
+
+.ats-loading-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 0;
+  color: #6544ef;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.loading-spinner.small {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+}
+
+.ats-error-box {
+  background: #fff2f2;
+  border: 1px solid #ffd4d4;
+  border-radius: 10px;
+  padding: 14px;
+  color: #c52222;
+  font-size: 13px;
+}
+
+.ats-score-badge {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ede8f5;
+}
+
+.ats-circular-score {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #6544ef;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(101, 68, 239, 0.3);
+}
+
+.ats-circular-score strong {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.ats-circular-score span {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  margin-top: 3px;
+}
+
+.ats-score-summary p {
+  margin: 0 0 4px;
+  color: #312940;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.ats-detail-block {
+  margin-top: 12px;
+}
+
+.ats-detail-label {
+  display: block;
+  color: #7b7389;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.ats-detail-label.missing {
+  color: #c53030;
+}
+
+.ats-suggestions-text {
+  margin: 0;
+  color: #433c4f;
+  font-size: 13px;
+  line-height: 1.6;
+  background: #ffffff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #eeeaf2;
+  white-space: pre-wrap;
+}
+
+/* ==========================================================================
+   SWIPE HISTORY STYLES
+   ========================================================================== */
+
+.swipe-history-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.history-filter-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid #e0dbe8;
+  background: #ffffff;
+  color: #554e60;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-tab:hover {
+  border-color: #6544ef;
+  color: #6544ef;
+}
+
+.filter-tab.active {
+  background: #6544ef;
+  color: #ffffff;
+  border-color: #6544ef;
+  box-shadow: 0 3px 10px rgba(101, 68, 239, 0.25);
+}
+
+.filter-tab.tab-right.active {
+  background: #059669;
+  border-color: #059669;
+}
+.filter-tab.tab-save.active {
+  background: #4b4457;
+  border-color: #4b4457;
+}
+.filter-tab.tab-left.active {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.history-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.history-card {
+  background: #ffffff;
+  border: 1px solid #e7e3ed;
+  border-left-width: 5px;
+  border-radius: 14px;
+  padding: 18px 22px;
+  box-shadow: 0 4px 15px rgba(50, 40, 80, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.history-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(50, 40, 80, 0.07);
+}
+
+.history-card.border-right {
+  border-left-color: #059669;
+}
+.history-card.border-left {
+  border-left-color: #dc2626;
+}
+.history-card.border-save {
+  border-left-color: #6b7280;
+}
+
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.history-job-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #2b233a;
+}
+
+.history-company-name {
+  margin: 0;
+  color: #726a7e;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.history-badge {
+  padding: 5px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.badge-right {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-left {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.badge-save {
+  background: #f3f4f6;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+}
+
+.history-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f2eff6;
+  font-size: 12.5px;
+  color: #8b8398;
+}
+
+.history-salary {
+  font-weight: 700;
+  color: #4f475c;
+}
+
+/* ==========================================================================
+   SKILL CHIPS INPUT COMPONENT IN PROFILE
+   ========================================================================== */
+
+.skill-input-container {
+  width: 100%;
+}
+
+.skill-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #eee9ff;
+  color: #6544ef;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.chip-remove {
+  background: none;
+  border: none;
+  color: #8367f3;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 2px;
+  line-height: 1;
+}
+.chip-remove:hover {
+  color: #dc2626;
+}
+

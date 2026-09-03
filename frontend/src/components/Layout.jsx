@@ -11,13 +11,10 @@ function Layout() {
   };
 
   const navItems = [
-    { path: "/dashboard", label: "Dashboard" },
-    { path: "/profile", label: "Profile" },
-    { path: "/resume", label: "Resume & ATS" },
-    { path: "/ai-matches", label: "AI Matches" },
-    { path: "/applications", label: "Applications" },
-    { path: "/saved-jobs", label: "Saved Jobs" },
-    
+    { path: "/profile", label: "Profile", icon: "👤" },
+    { path: "/resume", label: "Resume", icon: "📄" },
+    { path: "/recommended-jobs", label: "Recommended Jobs", icon: "✨" },
+    { path: "/swipe-history", label: "Swipe History", icon: "🕒" },
   ];
 
   const username =
@@ -27,25 +24,17 @@ function Layout() {
 
   return (
     <div className="app-layout">
-
       <aside className="sidebar">
-
         <div className="sidebar-brand">
-          <div className="sidebar-logo">
-            SX
-          </div>
-
+          <div className="sidebar-logo">SX</div>
           <div>
             <h2>SWIPE X</h2>
-            <span>Candidate Portal</span>
+            <span>Job Discovery</span>
           </div>
         </div>
 
         <nav className="sidebar-nav">
-
-          <p className="nav-heading">
-            WORKSPACE
-          </p>
+          <p className="nav-heading">WORKSPACE</p>
 
           {navItems.map((item) => (
             <NavLink
@@ -55,58 +44,41 @@ function Layout() {
                 `nav-link ${isActive ? "active" : ""}`
               }
             >
+              <span style={{ marginRight: "10px", fontSize: "16px" }}>
+                {item.icon}
+              </span>
               {item.label}
             </NavLink>
           ))}
-
         </nav>
 
         <div className="sidebar-bottom">
-
           <div className="ai-card">
-            <strong>AI Job Matching</strong>
-
-            <span>
-              Find opportunities that fit your
-              profile.
-            </span>
+            <strong>AI Recommendation</strong>
+            <span>Personalized jobs based on skills, profile & swipe feedback.</span>
           </div>
 
-          <button
-            className="logout-button"
-            onClick={handleLogout}
-          >
+          <button className="logout-button" onClick={handleLogout}>
             Logout
           </button>
-
         </div>
-
       </aside>
 
       <main className="main-content">
-
         <header className="topbar">
-
           <div>
-            <span className="topbar-title">
-              Candidate Workspace
-            </span>
+            <span className="topbar-title">Candidate Workspace</span>
           </div>
 
           <div className="topbar-right">
-            <div className="user-name">
-              {username}
-            </div>
+            <div className="user-name">{username}</div>
           </div>
-
         </header>
 
         <section className="content-area">
           <Outlet />
         </section>
-
       </main>
-
     </div>
   );
 }
