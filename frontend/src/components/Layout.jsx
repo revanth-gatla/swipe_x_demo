@@ -15,6 +15,7 @@ function Layout() {
     { path: "/resume", label: "Resume", icon: "📄" },
     { path: "/recommended-jobs", label: "Recommended Jobs", icon: "✨" },
     { path: "/swipe-history", label: "Swipe History", icon: "🕒" },
+    { path: "/discover-jobs", label: "Discover Jobs", icon: "🔍" },
   ];
 
   const username =

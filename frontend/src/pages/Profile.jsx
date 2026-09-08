@@ -27,39 +27,47 @@ function Profile() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    loadProfile();
-  }, []);
+    let ignore = false;
 
-  const loadProfile = async () => {
-    try {
-      setLoading(true);
-      setError("");
+    const loadProfile = async () => {
+      try {
+        const response = await API.get("/profile");
 
-      const response = await API.get("/profile");
-
-      setProfile({
-        ...EMPTY_PROFILE,
-        ...response.data,
-      });
-
-      setExists(true);
-      setEditing(false);
-    } catch (err) {
-      if (err.response?.status === 404) {
-        setProfile(EMPTY_PROFILE);
-        setExists(false);
-        setEditing(true);
-      } else if (err.response?.status === 401) {
-        setError("Session expired. Please login again.");
-      } else {
-        setError(
-          err.response?.data?.detail || "Unable to load profile."
-        );
+        if (!ignore) {
+          setProfile({
+            ...EMPTY_PROFILE,
+            ...response.data,
+          });
+          setExists(true);
+          setEditing(false);
+        }
+      } catch (err) {
+        if (!ignore) {
+          if (err.response?.status === 404) {
+            setProfile(EMPTY_PROFILE);
+            setExists(false);
+            setEditing(true);
+          } else if (err.response?.status === 401) {
+            setError("Session expired. Please login again.");
+          } else {
+            setError(
+              err.response?.data?.detail || "Unable to load profile."
+            );
+          }
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    loadProfile();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleChange = (field, value) => {
     setProfile((current) => ({
@@ -175,9 +183,6 @@ function Profile() {
         <div>
           <p className="page-label">CANDIDATE PROFILE</p>
           <h1>Your Profile</h1>
-          <p className="page-description">
-            Your candidate profile and preferences are used by the AI engine to recommend ideal jobs.
-          </p>
         </div>
 
         {exists && !editing && (
@@ -270,7 +275,6 @@ function Profile() {
           <div className="profile-section">
             <div className="profile-section-title">
               <h2>1. Candidate Information</h2>
-              <p>Personal and academic background.</p>
             </div>
 
             <div className="profile-form-grid">
@@ -337,18 +341,15 @@ function Profile() {
                   }
                   placeholder="e.g. 2.5 (decimals supported)"
                 />
-                <small style={{ color: "#777", marginTop: "4px", display: "block" }}>
-                  Supports 0, 1, 2.5, 3.5, etc.
-                </small>
+
               </div>
             </div>
           </div>
 
           {/* SECTION 2: CANDIDATE PREFERENCES */}
-          <div className="profile-section" style={{ marginTop: "30px", paddingTop: "25px", borderTop: "1px solid #eeeaf2" }}>
+          <div className="profile-section" style={{ marginTop: "18px", paddingTop: "18px", borderTop: "1px solid #eeeaf2" }}>
             <div className="profile-section-title">
               <h2>2. Candidate Preferences</h2>
-              <p>These preferences personalize your job recommendation rankings.</p>
             </div>
 
             <div className="profile-form-grid">
@@ -361,9 +362,7 @@ function Profile() {
                   onChange={(e) => handleChange("preferred_roles", e.target.value)}
                   placeholder="e.g. Backend Developer, Python Engineer"
                 />
-                <small style={{ color: "#777", marginTop: "4px", display: "block" }}>
-                  Comma-separated roles
-                </small>
+
               </div>
 
               {/* PREFERRED LOCATIONS */}
@@ -377,9 +376,7 @@ function Profile() {
                   }
                   placeholder="e.g. Remote, Bangalore, Hyderabad"
                 />
-                <small style={{ color: "#777", marginTop: "4px", display: "block" }}>
-                  Comma-separated cities or Remote
-                </small>
+
               </div>
 
               {/* WORK MODE PREFERENCE */}
@@ -414,10 +411,9 @@ function Profile() {
           </div>
 
           {/* SECTION 3: SKILLS & BIO */}
-          <div className="profile-section" style={{ marginTop: "30px", paddingTop: "25px", borderTop: "1px solid #eeeaf2" }}>
+          <div className="profile-section" style={{ marginTop: "18px", paddingTop: "18px", borderTop: "1px solid #eeeaf2" }}>
             <div className="profile-section-title">
               <h2>3. Skills & Bio</h2>
-              <p>Add technical and professional skills for matching.</p>
             </div>
 
             <div className="profile-form-grid">
@@ -425,36 +421,31 @@ function Profile() {
               <div className="profile-field full">
                 <label>Skills</label>
                 <div className="skill-input-container">
-                  <div className="skill-chips-row">
-                    {skillsList.map((skill, idx) => (
-                      <span className="skill-chip" key={idx}>
-                        {skill}
-                        <button
-                          type="button"
-                          className="chip-remove"
-                          onClick={() => removeSkill(skill)}
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
+                  {skillsList.length > 0 && (
+                    <div className="skill-chips-row" style={{ marginBottom: "8px" }}>
+                      {skillsList.map((skill, idx) => (
+                        <span className="skill-chip" key={idx}>
+                          {skill}
+                          <button
+                            type="button"
+                            className="chip-remove"
+                            onClick={() => removeSkill(skill)}
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
-                  <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                  <div>
                     <input
                       type="text"
                       value={skillInput}
                       onChange={(e) => setSkillInput(e.target.value)}
                       onKeyDown={handleSkillKeyDown}
-                      placeholder="Type a skill and press Enter or comma (e.g. Python, Docker, PostgreSQL)"
+                      placeholder="Type a skill and press Enter or comma"
                     />
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      onClick={() => addSkill(skillInput)}
-                    >
-                      + Add
-                    </button>
                   </div>
                 </div>
               </div>

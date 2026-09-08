@@ -3,7 +3,6 @@ import API from "../services/api";
 
 function RecommendedJobs() {
   const [jobs, setJobs] = useState([]);
-  const [candidateInfo, setCandidateInfo] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -23,10 +22,6 @@ function RecommendedJobs() {
   const startPoint = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
 
-  useEffect(() => {
-    fetchRecommendations();
-  }, []);
-
   const fetchRecommendations = async () => {
     setLoading(true);
     setError("");
@@ -37,10 +32,6 @@ function RecommendedJobs() {
     try {
       const response = await API.get("/recommended-jobs");
       const data = response.data;
-
-      if (data.candidate) {
-        setCandidateInfo(data.candidate);
-      }
 
       const recs = data.recommendations || [];
       setJobs(recs);
@@ -58,14 +49,44 @@ function RecommendedJobs() {
     }
   };
 
-  const currentJob = jobs[currentIndex];
-
-  // Reset ATS report when moving to next job
   useEffect(() => {
-    setAtsReport(null);
-    setAtsError("");
-    setShowAts(false);
-  }, [currentIndex]);
+    let ignore = false;
+
+    const loadRecommendations = async () => {
+      try {
+        const response = await API.get("/recommended-jobs");
+        const data = response.data;
+
+        if (!ignore) {
+          const recs = data.recommendations || [];
+          setJobs(recs);
+          setCurrentIndex(0);
+
+          if (recs.length === 0 && data.message) {
+            setEmptyMessage(data.message);
+          }
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(
+            err.response?.data?.detail || "Unable to load recommended jobs."
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadRecommendations();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const currentJob = jobs[currentIndex];
 
   // Execute swipe via API and animate
   const handleSwipe = async (swipeAction) => {
@@ -89,6 +110,9 @@ function RecommendedJobs() {
       setAction("");
       setSwipingId(null);
       setDrag({ active: false, x: 0, y: 0 });
+      setAtsReport(null);
+      setAtsError("");
+      setShowAts(false);
     }, 280);
   };
 
@@ -166,9 +190,6 @@ function RecommendedJobs() {
         <div>
           <p className="ai-label">AI RECOMMENDATION ENGINE</p>
           <h1>Recommended Jobs</h1>
-          <p>
-            Ranked based on your skills (70%), experience (20%), role relevance (10%), preferences & swipe feedback.
-          </p>
         </div>
       </div>
 
@@ -230,7 +251,21 @@ function RecommendedJobs() {
                 onClick={() => handleSwipe("LEFT")}
                 title="Swipe Left: Not Interested"
               >
-                <span>✕</span>
+                <span>
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 18c0-7-5-11-15-11" />
+                    <polyline points="9 3 4 7 9 11" />
+                  </svg>
+                </span>
                 <strong>PASS</strong>
                 <small>Not interested</small>
               </div>
@@ -240,7 +275,21 @@ function RecommendedJobs() {
                 onClick={() => handleSwipe("SAVE")}
                 title="Swipe Down: Save for Later"
               >
-                <span>🔖</span>
+                <span>
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="12" y1="3" x2="12" y2="20" />
+                    <polyline points="6 14 12 20 18 14" />
+                  </svg>
+                </span>
                 <strong>SAVE</strong>
                 <small>Save for later</small>
               </div>
@@ -250,7 +299,21 @@ function RecommendedJobs() {
                 onClick={() => handleSwipe("RIGHT")}
                 title="Swipe Right: Interested"
               >
-                <span>✓</span>
+                <span>
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 18c0-7 5-11 15-11" />
+                    <polyline points="15 3 20 7 15 11" />
+                  </svg>
+                </span>
                 <strong>INTERESTED</strong>
                 <small>High interest</small>
               </div>
@@ -423,7 +486,7 @@ function RecommendedJobs() {
                                   ? "High compatibility with this job description!"
                                   : atsReport.ats_score >= 60
                                   ? "Moderate compatibility. Address missing skills to improve."
-                                  : "Low compatibility. Consider tailoring your resume for this role."}
+                                  : "Low compatibility."}
                               </p>
                               {atsReport.cached && (
                                 <small style={{ color: "#8a8198" }}>⚡ Loaded from saved report</small>
@@ -446,7 +509,7 @@ function RecommendedJobs() {
 
                           {atsReport.missing_skills && (
                             <div className="ats-detail-block">
-                              <span className="ats-detail-label missing">Missing Keywords</span>
+                              <span className="ats-detail-label missing">MISSING KEYWORDS / SKILLS</span>
                               <div className="skills-row">
                                 {atsReport.missing_skills.split(",").map((s, idx) => (
                                   <span key={idx} className="missing-skill">
@@ -477,7 +540,20 @@ function RecommendedJobs() {
                     onClick={() => handleSwipe("LEFT")}
                     title="Not Interested"
                   >
-                    ✕ Pass
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20 18c0-7-5-11-15-11" />
+                      <polyline points="9 3 4 7 9 11" />
+                    </svg>
+                    Pass
                   </button>
 
                   <button
@@ -486,7 +562,20 @@ function RecommendedJobs() {
                     onClick={() => handleSwipe("SAVE")}
                     title="Save for Later"
                   >
-                    🔖 Save
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="12" y1="3" x2="12" y2="20" />
+                      <polyline points="6 14 12 20 18 14" />
+                    </svg>
+                    Save
                   </button>
 
                   <button
@@ -495,7 +584,20 @@ function RecommendedJobs() {
                     onClick={() => handleSwipe("RIGHT")}
                     title="Interested"
                   >
-                    ✓ Interested
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M4 18c0-7 5-11 15-11" />
+                      <polyline points="15 3 20 7 15 11" />
+                    </svg>
+                    Interested
                   </button>
                 </div>
               </div>

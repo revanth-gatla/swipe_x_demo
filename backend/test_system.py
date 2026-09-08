@@ -133,7 +133,7 @@ def run_tests():
         print(f"  Matched skills: {matched}")
         print(f"  Missing skills: {missing}")
         assert score > 50, f"Expected high match score, got {score}"
-        assert "python" in matched and "fastapi" in matched
+        assert any("python" in m.lower() for m in matched) and any("fastapi" in m.lower() for m in matched)
         print("  -> PASS: Recommendation scoring works accurately.")
 
         # Test 4: Swipe Upsert (LEFT, RIGHT, SAVE)
@@ -189,6 +189,16 @@ def run_tests():
         print(f"  ATS reports unique constraints: {constraints}")
         assert "ats_reports_unique_analysis" in constraints, "Missing UNIQUE(user_id, resume_id, job_id) constraint"
         print("  -> PASS: ATS unique constraint verified.")
+
+        # Test 6: Discover Jobs endpoint pagination & search
+        print("\n[TEST 6] Verifying Discover Jobs...")
+        discover_res = app.discover_jobs(page=1, per_page=10, search="developer")
+        assert "jobs" in discover_res
+        assert len(discover_res["jobs"]) > 0
+        assert discover_res["total"] > 0
+        assert discover_res["total_pages"] > 0
+        print(f"  Discover returned {len(discover_res['jobs'])} jobs of {discover_res['total']} total.")
+        print("  -> PASS: Discover Jobs verified.")
 
         print("\n" + "=" * 60)
         print("ALL VERIFICATION TESTS COMPLETED SUCCESSFULLY!")

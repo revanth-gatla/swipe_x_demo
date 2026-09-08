@@ -11,12 +11,7 @@ function Resume() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    fetchCurrentResume();
-  }, []);
-
-  const fetchCurrentResume = async () => {
-    setFetching(true);
+  const refreshResume = async () => {
     try {
       const res = await API.get("/resume");
       if (res.data?.resume) {
@@ -24,10 +19,33 @@ function Resume() {
       }
     } catch (err) {
       console.error("Failed to fetch resume:", err);
-    } finally {
-      setFetching(false);
     }
   };
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadResume = async () => {
+      try {
+        const res = await API.get("/resume");
+        if (!ignore && res.data?.resume) {
+          setCurrentResume(res.data.resume);
+        }
+      } catch (err) {
+        console.error("Failed to fetch resume:", err);
+      } finally {
+        if (!ignore) {
+          setFetching(false);
+        }
+      }
+    };
+
+    loadResume();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
@@ -75,7 +93,7 @@ function Resume() {
       setFile(null);
 
       // Refresh stored resume state
-      fetchCurrentResume();
+      refreshResume();
     } catch (err) {
       setError(
         err.response?.data?.detail || "Resume upload and extraction failed."
@@ -108,10 +126,7 @@ function Resume() {
       <div className="resume-header">
         <div>
           <p className="page-label">RESUME WORKSPACE</p>
-          <h1>Resume & Skills Extraction</h1>
-          <p className="page-description">
-            Upload your resume. SWIPE X automatically extracts your skills and experience to power job recommendations and job-specific ATS analyses.
-          </p>
+          <h1>Resume Analysis</h1>
         </div>
       </div>
 
@@ -121,9 +136,6 @@ function Resume() {
       {/* SINGLE UPLOAD ACTION CARD */}
       <section className="resume-card">
         <h2>Upload Resume</h2>
-        <p className="resume-card-description">
-          Select your PDF resume. Uploading automatically saves, parses, and extracts your key skills and experience in one seamless step.
-        </p>
 
         <label className="resume-upload-box">
           <input
@@ -162,9 +174,7 @@ function Resume() {
           )}
         </div>
 
-        <div style={{ marginTop: "14px", color: "#81798d", fontSize: "12px" }}>
-          ℹ️ <strong>Note:</strong> Resume extraction data is stored independently and will <strong>not</strong> overwrite your manual Candidate Profile.
-        </div>
+
       </section>
 
       {/* EXTRACTED INFORMATION CARD */}

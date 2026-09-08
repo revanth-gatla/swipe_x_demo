@@ -1020,8 +1020,11 @@
 }
 
 .swipe-direction span {
-  font-size: 26px;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  width: 34px;
 }
 
 .swipe-direction strong {

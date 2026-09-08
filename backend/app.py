@@ -545,6 +545,113 @@ def get_job(job_id: int):
         connection.close()
 
 
+@app.get("/discover-jobs")
+def discover_jobs(
+    page: int = 1,
+    per_page: int = 20,
+    search: str = "",
+):
+    """
+    Browse all jobs with server-side pagination and optional search.
+    No authentication required for browsing.
+    """
+    if page < 1:
+        page = 1
+    if per_page < 1:
+        per_page = 20
+    if per_page > 100:
+        per_page = 100
+
+    offset = (page - 1) * per_page
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    try:
+        search_term = search.strip()
+
+        if search_term:
+            like_pattern = f"%{search_term}%"
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM jobs
+                WHERE title ILIKE %s
+                   OR company ILIKE %s
+                   OR location ILIKE %s;
+                """,
+                (like_pattern, like_pattern, like_pattern)
+            )
+            total = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                SELECT
+                    id, title, company, location, description,
+                    required_skills, experience_required, salary,
+                    job_type, application_url, created_at,
+                    experience_level, remote_allowed, work_mode, source
+                FROM jobs
+                WHERE title ILIKE %s
+                   OR company ILIKE %s
+                   OR location ILIKE %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s;
+                """,
+                (like_pattern, like_pattern, like_pattern, per_page, offset)
+            )
+        else:
+            cursor.execute("SELECT COUNT(*) FROM jobs;")
+            total = cursor.fetchone()[0]
+
+            cursor.execute(
+                """
+                SELECT
+                    id, title, company, location, description,
+                    required_skills, experience_required, salary,
+                    job_type, application_url, created_at,
+                    experience_level, remote_allowed, work_mode, source
+                FROM jobs
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s;
+                """,
+                (per_page, offset)
+            )
+
+        jobs = cursor.fetchall()
+        total_pages = max(1, (total + per_page - 1) // per_page)
+
+        return {
+            "jobs": [
+                {
+                    "id": j[0],
+                    "title": j[1],
+                    "company": j[2],
+                    "location": j[3],
+                    "description": (j[4] or "")[:250],
+                    "required_skills": j[5],
+                    "experience_required": float(j[6]) if j[6] is not None else None,
+                    "salary": j[7],
+                    "job_type": j[8],
+                    "application_url": j[9],
+                    "created_at": str(j[10]) if j[10] else None,
+                    "experience_level": j[11],
+                    "remote_allowed": j[12],
+                    "work_mode": j[13],
+                    "source": j[14],
+                }
+                for j in jobs
+            ],
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "total_pages": total_pages,
+        }
+
+    finally:
+        cursor.close()
+        connection.close()
+
+
 # ---------------------------------------------------------------------------
 # Resume: single-action upload → parse → extract
 # ---------------------------------------------------------------------------
@@ -872,28 +979,28 @@ def _compute_match_score(job, candidate_skills, candidate_years,
     ) = job
 
     # --- 70% SKILLS MATCHING ---
-    required_skill_list = [
-        s.strip().lower()
+    raw_required_skills = [
+        s.strip()
         for s in (required_skills or "").split(",")
         if s.strip()
     ]
+    required_skill_list = [s.lower() for s in raw_required_skills]
 
     if not required_skill_list:
         skill_score = 35  # Half credit if no requirements listed
         matched_skills = []
         missing_skills = []
     else:
-        matched_skills = [
-            skill for skill in required_skill_list
+        matched_skills = []
+        missing_skills = []
+        for i, skill_lower in enumerate(required_skill_list):
             if any(
-                skill == cs or skill in cs or cs in skill
+                skill_lower == cs or skill_lower in cs or cs in skill_lower
                 for cs in candidate_skills
-            )
-        ]
-        missing_skills = [
-            skill for skill in required_skill_list
-            if skill not in matched_skills
-        ]
+            ):
+                matched_skills.append(raw_required_skills[i])
+            else:
+                missing_skills.append(raw_required_skills[i])
         skill_score = (
             len(matched_skills) / len(required_skill_list)
         ) * 70

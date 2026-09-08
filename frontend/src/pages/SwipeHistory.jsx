@@ -8,23 +8,33 @@ function SwipeHistory() {
   const [filter, setFilter] = useState("ALL");
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    let ignore = false;
 
-  const fetchHistory = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await API.get("/swipe-history");
-      setHistory(res.data || []);
-    } catch (err) {
-      setError(
-        err.response?.data?.detail || "Failed to load swipe history."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchHistory = async () => {
+      try {
+        const res = await API.get("/swipe-history");
+        if (!ignore) {
+          setHistory(res.data || []);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(
+            err.response?.data?.detail || "Failed to load swipe history."
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchHistory();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const filteredHistory = history.filter((item) => {
     if (filter === "ALL") return true;
@@ -73,9 +83,6 @@ function SwipeHistory() {
         <div>
           <p className="page-label">ACTIVITY LOG</p>
           <h1>Swipe History</h1>
-          <p className="page-description">
-            Review your past interactions. The AI engine learns from your swipes to continuously personalize future recommendations.
-          </p>
         </div>
       </div>
 

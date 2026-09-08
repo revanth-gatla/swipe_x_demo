@@ -6,6 +6,7 @@ import Profile from "./pages/Profile";
 import Resume from "./pages/Resume";
 import RecommendedJobs from "./pages/RecommendedJobs";
 import SwipeHistory from "./pages/SwipeHistory";
+import DiscoverJobs from "./pages/DiscoverJobs";
 
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -26,6 +27,7 @@ function App() {
           <Route path="/resume" element={<Resume />} />
           <Route path="/recommended-jobs" element={<RecommendedJobs />} />
           <Route path="/swipe-history" element={<SwipeHistory />} />
+          <Route path="/discover-jobs" element={<DiscoverJobs />} />
 
           {/* Backward compatibility redirects */}
           <Route
