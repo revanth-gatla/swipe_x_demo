@@ -1,3 +1,7 @@
+# Database dump files (too large for Git)
+scripts/swipe_x_full_dump.sql
+*.dump
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
