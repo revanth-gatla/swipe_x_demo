@@ -1,4 +1,4 @@
-# Render Blueprint — SWIPE X Platform
+# Render Blueprint — SWIPE X Backend & Database
 # https://render.com/docs/blueprint-spec
 
 databases:
@@ -26,29 +26,6 @@ services:
       - key: GROQ_API_KEY
         sync: false
       - key: JWT_SECRET_KEY
-        generateValue: true  # Render auto-generates a secure random string
-      - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: swipe-x-frontend
-          property: host
+        generateValue: true
       - key: PYTHON_VERSION
         value: "3.11.12"
-
-  # ── Frontend (React + Vite → Static Site) ──────────────────
-  - type: web
-    name: swipe-x-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          type: web
-          name: swipe-x-backend
-          property: host
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
