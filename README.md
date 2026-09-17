@@ -225,3 +225,16 @@ The frontend will be available at [http://localhost:5173](http://localhost:5173)
 ## License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+
+
+---
+
+## 📌 Project Credits
+
+**Project:** SWIPE X  
+**Title:** AI-Powered Job Discovery & Personalized Recommendation Platform  
+**Program:** Infosys Springboard Internship  
+**Project Type:** Internship / Capstone Project
+
+**Developed by:**  
+Revanth Gatla
