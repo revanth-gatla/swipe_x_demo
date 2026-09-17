@@ -25,10 +25,7 @@ ENV_FILE = BASE_DIR / ".env"
 
 load_dotenv(ENV_FILE, override=True)
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-if not GROQ_API_KEY:
-    raise RuntimeError("GROQ_API_KEY not set. Add it to backend/.env or as an environment variable.")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 app = FastAPI(title="SWIPE X API")
 
@@ -70,7 +67,12 @@ def startup_event():
     except Exception as e:
         print("[Startup] Catalog pre-warm skipped or failed:", e)
 
-client = Groq(api_key=GROQ_API_KEY)
+client = None
+if GROQ_API_KEY:
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+    except Exception as e:
+        print("[Startup] Groq client warning:", e)
 security = HTTPBearer()
 
 pwd_context = CryptContext(
