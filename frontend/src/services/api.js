@@ -1,7 +1,7 @@
 import axios from "axios";
 
 let rawUrl = import.meta.env.VITE_API_URL;
-if (!rawUrl || rawUrl === "http://localhost:8000") {
+if (!rawUrl || rawUrl === "http://localhost:8000" || rawUrl.includes("dashboard.render.com")) {
   if (
     typeof window !== "undefined" &&
     window.location.hostname &&
