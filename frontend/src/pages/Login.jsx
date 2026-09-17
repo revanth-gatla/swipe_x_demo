@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { clearRecommendationsCache } from "../services/cache";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -28,6 +29,14 @@ function Login() {
           password,
         }
       );
+
+      // Clear any prior user's recommendations from cache & session storage
+      clearRecommendationsCache();
+      try {
+        sessionStorage.clear();
+      } catch {
+        // Ignore
+      }
 
       localStorage.setItem(
         "access_token",

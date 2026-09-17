@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import API from "../services/api.js";
+import { clearRecommendationsCache } from "../services/cache.js";
 
 function Resume() {
   const [file, setFile] = useState(null);
@@ -89,11 +90,12 @@ function Resume() {
       });
 
       setUploadResult(response.data);
-      setSuccessMessage("Resume uploaded, parsed, and skills extracted successfully!");
+      setSuccessMessage("Resume Analyzed Successfully✓");
       setFile(null);
 
-      // Refresh stored resume state
+      // Refresh stored resume state and invalidate recommendations cache
       refreshResume();
+      clearRecommendationsCache();
     } catch (err) {
       setError(
         err.response?.data?.detail || "Resume upload and extraction failed."
@@ -147,7 +149,7 @@ function Resume() {
 
           <div style={{ fontSize: "28px" }}>📄</div>
           <strong>
-            {file ? file.name : "Choose your PDF resume (click to browse)"}
+            {file ? file.name : "Choose Resume"}
           </strong>
           <span>PDF documents only • Max 10MB</span>
         </label>
@@ -158,7 +160,7 @@ function Resume() {
             onClick={handleSingleActionUpload}
             disabled={!file || loading}
           >
-            {loading ? "Processing Resume (Saving, Parsing & Extracting)..." : "Upload & Process Resume"}
+            {loading ? "Analyzing Resume..." : "Analyze Resume🔎"}
           </button>
 
           {file && !loading && (

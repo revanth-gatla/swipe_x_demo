@@ -17,6 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
 import re
 import traceback
+import time
+import math
 
 BASE_DIR = Path(__file__).resolve().parent
 ENV_FILE = BASE_DIR / ".env"
@@ -49,6 +51,18 @@ app.add_middleware(
         "Content-Type",
     ],
 )
+
+@app.on_event("startup")
+def warm_up_catalog():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        _get_cached_jobs_catalog(cur)
+        cur.close()
+        conn.close()
+        print("[Startup] Jobs catalog cache pre-warmed into memory (33,000+ jobs ready).")
+    except Exception as e:
+        print("[Startup] Catalog pre-warm skipped or failed:", e)
 
 client = Groq(api_key=GROQ_API_KEY)
 security = HTTPBearer()
@@ -297,6 +311,7 @@ def create_profile(
         profile_id = cursor.fetchone()[0]
 
         connection.commit()
+        invalidate_recommendation_cache(user_id)
 
         return {
             "message": "Profile created successfully",
@@ -411,6 +426,7 @@ def update_profile(
             )
 
         connection.commit()
+        invalidate_recommendation_cache(user_id)
 
         return {
             "message": "Profile updated successfully",
@@ -781,6 +797,7 @@ def upload_resume(
 
         resume_id = cursor.fetchone()[0]
         connection.commit()
+        invalidate_recommendation_cache(user_id)
 
         return {
             "message": "Resume uploaded and processed successfully",
@@ -857,6 +874,112 @@ def get_resume(
 # ---------------------------------------------------------------------------
 # Recommendation Engine (70/20/10 + preferences + swipe feedback)
 # ---------------------------------------------------------------------------
+
+# Global In-Memory Recommendation Cache
+# Key: user_id -> {"data": response_dict, "timestamp": float}
+_RECOMMENDATION_CACHE = {}
+_REC_CACHE_TTL = 900  # 15 minutes TTL
+
+def invalidate_recommendation_cache(user_id: int = None):
+    """Invalidate recommendation cache for a specific user or all users."""
+    global _RECOMMENDATION_CACHE
+    if user_id is not None:
+        _RECOMMENDATION_CACHE.pop(user_id, None)
+    else:
+        _RECOMMENDATION_CACHE.clear()
+
+# Global In-Memory Jobs Catalog Cache (avoids querying 33,000 rows across DB socket on every request)
+_JOBS_CATALOG_CACHE = {
+    "items": [],
+    "timestamp": 0,
+}
+_JOBS_CATALOG_TTL = 3600  # 1 hour
+
+def _get_cached_jobs_catalog(cursor):
+    """Retrieve all jobs from pre-indexed memory cache, refreshing from DB only every 1 hour."""
+    global _JOBS_CATALOG_CACHE
+    now = time.time()
+    if _JOBS_CATALOG_CACHE["items"] and (now - _JOBS_CATALOG_CACHE["timestamp"] < _JOBS_CATALOG_TTL):
+        return _JOBS_CATALOG_CACHE["items"]
+
+    cursor.execute(
+        """
+        SELECT
+            id, title, company, location,
+            substring(description from 1 for 300) AS desc_snippet,
+            required_skills, experience_required, salary,
+            job_type, application_url, created_at,
+            experience_level, remote_allowed, work_mode, source
+        FROM jobs;
+        """
+    )
+    rows = cursor.fetchall()
+    items = []
+    for r in rows:
+        req_skills_str = r[5] or ""
+        raw_skills = [s.strip() for s in req_skills_str.split(",") if s.strip()]
+        skills_set = {s.lower() for s in raw_skills}
+
+        req_years = float(r[6] or 0)
+        if req_years == 0 and r[11]:
+            req_years = EXPERIENCE_LEVEL_MAP.get(r[11].lower().strip(), 0)
+
+        t_lower = (r[1] or "").lower()
+        items.append({
+            "id": r[0],
+            "title": r[1] or "",
+            "company": r[2] or "",
+            "location": r[3] or "",
+            "description": r[4] or "",
+            "required_skills": r[5],
+            "salary": r[7],
+            "job_type": r[8],
+            "application_url": r[9],
+            "experience_required": float(r[6]) if r[6] is not None else None,
+            "experience_level": r[11],
+            "remote_allowed": bool(r[12]),
+            "work_mode": r[13],
+            "source": r[14],
+            "raw_row": r,
+            "title_lower": t_lower,
+            "title_words": t_lower.split(),
+            "location_lower": (r[3] or "").lower(),
+            "skills_set": skills_set,
+            "raw_skills": raw_skills,
+            "req_years": req_years,
+        })
+
+    _JOBS_CATALOG_CACHE["items"] = items
+    _JOBS_CATALOG_CACHE["timestamp"] = now
+    return items
+
+def invalidate_jobs_catalog_cache():
+    """Invalidate jobs catalog cache when jobs are imported/modified."""
+    global _JOBS_CATALOG_CACHE
+    _JOBS_CATALOG_CACHE["items"] = []
+    _JOBS_CATALOG_CACHE["timestamp"] = 0
+
+def _clean_skill_label(skill_str: str) -> str:
+    """Clean and normalize a skill label to avoid large sentence badges."""
+    if not skill_str:
+        return ""
+    s = skill_str.strip()
+    # Strip common requirement boilerplate prefixes
+    s = re.sub(
+        r"^(?:job\s+requirements?|requirements?|must\s+(?:have|be)|ability\s+to|responsible\s+for|preferred\s+(?:qualifications?|skills?)|and|or|with|to)[:\s\-]+",
+        "",
+        s,
+        flags=re.IGNORECASE
+    ).strip()
+    # If the string contains multiple sentences or semicolons, take first concise clause
+    if len(s) > 40:
+        parts = re.split(r"[.;\n]", s)
+        first_clause = parts[0].strip()
+        if len(first_clause) <= 35 and len(first_clause) > 2:
+            s = first_clause
+        else:
+            s = s[:32].rstrip() + "..."
+    return s.strip()
 
 # Experience level → approximate year ranges for matching
 EXPERIENCE_LEVEL_MAP = {
@@ -994,13 +1117,43 @@ def _compute_match_score(job, candidate_skills, candidate_years,
         matched_skills = []
         missing_skills = []
         for i, skill_lower in enumerate(required_skill_list):
-            if any(
-                skill_lower == cs or skill_lower in cs or cs in skill_lower
-                for cs in candidate_skills
-            ):
-                matched_skills.append(raw_required_skills[i])
+            raw_s = raw_required_skills[i]
+            matched_candidate_skill = None
+            for cs in candidate_skills:
+                cs_lower = cs.lower().strip()
+                if not cs_lower:
+                    continue
+                # 1. Exact match
+                if cs_lower == skill_lower:
+                    matched_candidate_skill = cs
+                    break
+                # 2. Word-boundary match (prevents single letters like 'c' matching inside 'education')
+                if len(cs_lower) <= 2:
+                    if re.search(r'(?<![a-zA-Z0-9])' + re.escape(cs_lower) + r'(?![a-zA-Z0-9])', skill_lower):
+                        if not re.search(r'^(?:education|degree|doctorate|bachelor|master|phd|high school)', skill_lower):
+                            matched_candidate_skill = cs
+                            break
+                else:
+                    if re.search(r'\b' + re.escape(cs_lower) + r'\b', skill_lower):
+                        matched_candidate_skill = cs
+                        break
+                    elif len(skill_lower) >= 3 and re.search(r'\b' + re.escape(skill_lower) + r'\b', cs_lower):
+                        matched_candidate_skill = cs
+                        break
+
+            if matched_candidate_skill:
+                # If raw requirement was a paragraph, use the clean concise candidate skill name!
+                if len(raw_s) > 35:
+                    clean_match = matched_candidate_skill.title()
+                else:
+                    clean_match = _clean_skill_label(raw_s) or matched_candidate_skill.title()
+                if clean_match and clean_match not in matched_skills:
+                    matched_skills.append(clean_match)
             else:
-                missing_skills.append(raw_required_skills[i])
+                clean_missing = _clean_skill_label(raw_s)
+                if clean_missing and clean_missing not in missing_skills:
+                    missing_skills.append(clean_missing)
+
         skill_score = (
             len(matched_skills) / len(required_skill_list)
         ) * 70
@@ -1093,6 +1246,70 @@ def _compute_match_score(job, candidate_skills, candidate_years,
     return total, matched_skills, missing_skills
 
 
+def _fast_match_score(
+    item, candidate_skills_set, candidate_years,
+    pref_roles_list, pref_locs_list,
+    preferred_work_mode,
+    boosted_skills, penalized_skills,
+    boosted_titles, penalized_titles
+):
+    """
+    Ultra-fast numeric scoring pass over pre-indexed job dictionary.
+    Returns integer match score (0-100) in microseconds.
+    """
+    skills_set = item["skills_set"]
+    if not skills_set:
+        skill_score = 35.0
+    else:
+        matched = len(candidate_skills_set & skills_set)
+        skill_score = (matched / len(skills_set)) * 70.0
+
+    req_years = item["req_years"]
+    if req_years == 0 or candidate_years >= req_years:
+        exp_score = 20.0
+    elif candidate_years > 0:
+        exp_score = (candidate_years / req_years) * 20.0
+    else:
+        exp_score = 0.0
+
+    t_lower = item["title_lower"]
+    role_score = min(sum(2 for cs in candidate_skills_set if cs in t_lower), 10.0)
+
+    pref_bonus = 0.0
+    if pref_roles_list and any(pr in t_lower for pr in pref_roles_list):
+        pref_bonus += 3.0
+    if pref_locs_list and any(pl in item["location_lower"] for pl in pref_locs_list):
+        pref_bonus += 3.0
+    if preferred_work_mode:
+        pwm = preferred_work_mode.lower().strip()
+        if pwm == "remote" and item["remote_allowed"]:
+            pref_bonus += 2.0
+        elif pwm == "on-site" and not item["remote_allowed"]:
+            pref_bonus += 2.0
+        elif pwm in item["location_lower"] or pwm in (item["work_mode"] or "").lower():
+            pref_bonus += 2.0
+
+    swipe_adj = 0.0
+    if boosted_skills or penalized_skills:
+        for s in skills_set:
+            if s in boosted_skills:
+                swipe_adj += 0.5
+            if s in penalized_skills:
+                swipe_adj -= 0.5
+
+    if boosted_titles or penalized_titles:
+        for w in item["title_words"]:
+            if w in boosted_titles:
+                swipe_adj += 0.3
+            if w in penalized_titles:
+                swipe_adj -= 0.3
+
+    swipe_adj = max(-5.0, min(5.0, swipe_adj))
+
+    total = skill_score + exp_score + role_score + pref_bonus + swipe_adj
+    return max(0, min(100, round(total)))
+
+
 @app.get("/recommended-jobs")
 def get_recommended_jobs(
     user_id: int = Depends(get_user_id)
@@ -1102,6 +1319,46 @@ def get_recommended_jobs(
 
     try:
         profile, resume = _get_candidate_data(cursor, user_id)
+
+        # Strictly enforce profile and resume completion
+        has_profile = bool(profile and (profile[0] or profile[1] is not None or profile[2]))
+        has_resume = bool(resume and (resume[0] or resume[1]))
+
+        if not has_profile and not has_resume:
+            return {
+                "candidate": {
+                    "skills": [],
+                    "experience_years": 0,
+                },
+                "recommendations": [],
+                "profile_completed": False,
+                "resume_uploaded": False,
+                "message": "Please complete your candidate profile and upload your resume to get AI job recommendations."
+            }
+
+        if not has_profile:
+            return {
+                "candidate": {
+                    "skills": [],
+                    "experience_years": 0,
+                },
+                "recommendations": [],
+                "profile_completed": False,
+                "resume_uploaded": True,
+                "message": "Please complete your candidate profile to set your skills, experience, and job preferences."
+            }
+
+        if not has_resume:
+            return {
+                "candidate": {
+                    "skills": [],
+                    "experience_years": 0,
+                },
+                "recommendations": [],
+                "profile_completed": True,
+                "resume_uploaded": False,
+                "message": "Please upload your resume to enable ATS matching and verified skill extraction."
+            }
 
         # Collect candidate skills from profile + resume
         candidate_skills = set()
@@ -1128,10 +1385,37 @@ def get_recommended_jobs(
                     "experience_years": 0,
                 },
                 "recommendations": [],
-                "message": "Please complete your profile or upload a resume to get recommendations."
+                "profile_completed": True,
+                "resume_uploaded": True,
+                "message": "Please add skills to your profile or upload a resume with skills to get recommendations."
             }
 
         candidate_skills = list(candidate_skills)
+
+        # Get already-swiped job IDs
+        cursor.execute(
+            "SELECT job_id FROM swipe_history WHERE user_id = %s;",
+            (user_id,)
+        )
+        swiped_ids = {row[0] for row in cursor.fetchall()}
+
+        # Check in-memory recommendation cache
+        now = time.time()
+        cached_entry = _RECOMMENDATION_CACHE.get(user_id)
+        if cached_entry and (now - cached_entry["timestamp"] < _REC_CACHE_TTL):
+            cached_data = cached_entry["data"]
+            cached_recs = cached_data.get("recommendations", [])
+            # Filter out any newly swiped IDs
+            active_recs = [r for r in cached_recs if r["job_id"] not in swiped_ids]
+            if active_recs:
+                return {
+                    "candidate": cached_data.get("candidate", {}),
+                    "recommendations": active_recs[:50],
+                    "total_available": len(active_recs),
+                    "profile_completed": True,
+                    "resume_uploaded": True,
+                    "cached": True,
+                }
 
         # Candidate experience years
         candidate_years = 0
@@ -1155,39 +1439,44 @@ def get_recommended_jobs(
         boosted_skills, penalized_skills, boosted_titles, penalized_titles = \
             _get_swipe_patterns(cursor, user_id)
 
-        # Get already-swiped job IDs (exclude from recommendations)
-        cursor.execute(
-            "SELECT job_id FROM swipe_history WHERE user_id = %s;",
-            (user_id,)
-        )
-        swiped_ids = {row[0] for row in cursor.fetchall()}
+        # Retrieve all jobs from in-memory catalog cache (0ms I/O)
+        jobs = _get_cached_jobs_catalog(cursor)
 
-        # Fetch all jobs
-        cursor.execute(
-            """
-            SELECT
-                id, title, company, location, description,
-                required_skills, experience_required, salary,
-                job_type, application_url, created_at,
-                experience_level, remote_allowed, work_mode, source
-            FROM jobs
-            ORDER BY created_at DESC;
-            """
-        )
+        candidate_skills_set = {s.lower() for s in candidate_skills}
+        pref_roles_list = [
+            r.strip().lower() for r in preferred_roles.split(",") if r.strip()
+        ] if preferred_roles else []
+        pref_locs_list = [
+            l.strip().lower() for l in preferred_locations.split(",") if l.strip()
+        ] if preferred_locations else []
 
-        jobs = cursor.fetchall()
-
-        recommendations = []
-
-        for job in jobs:
-            job_id = job[0]
+        # Stage 1: Ultra-fast numeric scoring pass across all 33k jobs
+        scored_jobs = []
+        for item in jobs:
+            job_id = item["id"]
 
             # Skip already-swiped jobs
             if job_id in swiped_ids:
                 continue
 
-            score, matched, missing = _compute_match_score(
-                job, candidate_skills, candidate_years,
+            score = _fast_match_score(
+                item, candidate_skills_set, candidate_years,
+                pref_roles_list, pref_locs_list,
+                preferred_work_mode,
+                boosted_skills, penalized_skills,
+                boosted_titles, penalized_titles,
+            )
+
+            scored_jobs.append((score, item))
+
+        # Sort by match score descending
+        scored_jobs.sort(key=lambda item: item[0], reverse=True)
+
+        # Stage 2: Detailed matched & missing skills formatting ONLY for top 50
+        recommendations = []
+        for score, item in scored_jobs[:50]:
+            _, matched, missing = _compute_match_score(
+                item["raw_row"], candidate_skills, candidate_years,
                 preferred_roles, preferred_locations,
                 preferred_work_mode,
                 boosted_skills, penalized_skills,
@@ -1195,39 +1484,43 @@ def get_recommended_jobs(
             )
 
             recommendations.append({
-                "job_id": job_id,
-                "title": job[1],
-                "company": job[2],
-                "location": job[3],
-                "description": (job[4] or "")[:300],
-                "required_skills": job[5],
-                "salary": job[7],
-                "job_type": job[8],
-                "application_url": job[9],
-                "experience_required": float(job[6]) if job[6] is not None else None,
-                "experience_level": job[11],
-                "remote_allowed": job[12],
-                "work_mode": job[13],
+                "job_id": item["id"],
+                "title": item["title"],
+                "company": item["company"],
+                "location": item["location"],
+                "description": item["description"],
+                "required_skills": item["required_skills"],
+                "salary": item["salary"],
+                "job_type": item["job_type"],
+                "application_url": item["application_url"],
+                "experience_required": item["experience_required"],
+                "experience_level": item["experience_level"],
+                "remote_allowed": item["remote_allowed"],
+                "work_mode": item["work_mode"],
                 "match_score": score,
                 "matched_skills": matched,
                 "missing_skills": missing,
             })
 
-        # Sort by match score descending
-        recommendations.sort(
-            key=lambda j: j["match_score"],
-            reverse=True
-        )
-
-        # Return top 50 recommendations
-        return {
+        result_payload = {
             "candidate": {
                 "skills": candidate_skills,
                 "experience_years": candidate_years,
             },
-            "recommendations": recommendations[:50],
-            "total_available": len(recommendations),
+            "recommendations": recommendations,
+            "total_available": len(scored_jobs),
+            "profile_completed": True,
+            "resume_uploaded": True,
+            "cached": False,
         }
+
+        # Store in global memory cache
+        _RECOMMENDATION_CACHE[user_id] = {
+            "data": result_payload,
+            "timestamp": time.time(),
+        }
+
+        return result_payload
 
     finally:
         cursor.close()
@@ -1285,6 +1578,14 @@ def swipe_job(
         result = cursor.fetchone()
         connection.commit()
 
+        # Update in-memory recommendation cache by removing swiped job
+        if user_id in _RECOMMENDATION_CACHE:
+            cached_data = _RECOMMENDATION_CACHE[user_id]["data"]
+            cached_recs = cached_data.get("recommendations", [])
+            cached_data["recommendations"] = [
+                r for r in cached_recs if r["job_id"] != data.job_id
+            ]
+
         return {
             "message": f"Job {action.lower()}ed successfully",
             "swipe_id": result[0],
@@ -1298,15 +1599,53 @@ def swipe_job(
 
 @app.get("/swipe-history")
 def get_swipe_history(
+    page: Optional[int] = None,
+    per_page: Optional[int] = None,
+    action: Optional[str] = None,
     user_id: int = Depends(get_user_id)
 ):
-    """Get the user's swipe history with job details."""
+    """Get the user's swipe history with job details (supports pagination, max 20 per page)."""
     connection = get_db_connection()
     cursor = connection.cursor()
 
     try:
+        where_clauses = ["sh.user_id = %s"]
+        params = [user_id]
+
+        if action and action.upper() in ("RIGHT", "LEFT", "SAVE"):
+            where_clauses.append("sh.action = %s")
+            params.append(action.upper())
+
+        where_sql = " AND ".join(where_clauses)
+
+        # Total count
         cursor.execute(
-            """
+            f"""
+            SELECT COUNT(*)
+            FROM swipe_history sh
+            WHERE {where_sql};
+            """,
+            tuple(params)
+        )
+        total = cursor.fetchone()[0]
+
+        # Support pagination (default: return all if not requested)
+        if page is not None or per_page is not None:
+            p = max(1, page or 1)
+            pp = 20 if per_page is None else max(1, min(100, per_page))
+            offset = (p - 1) * pp
+            query_params = list(params) + [pp, offset]
+            limit_clause = "LIMIT %s OFFSET %s"
+            total_pages = math.ceil(total / pp) if total > 0 and pp > 0 else 1
+        else:
+            p = 1
+            pp = total if total > 0 else 20
+            query_params = list(params)
+            limit_clause = ""
+            total_pages = 1
+
+        cursor.execute(
+            f"""
             SELECT
                 sh.id,
                 sh.job_id,
@@ -1318,15 +1657,17 @@ def get_swipe_history(
                 sh.created_at
             FROM swipe_history sh
             JOIN jobs j ON sh.job_id = j.id
-            WHERE sh.user_id = %s
-            ORDER BY sh.created_at DESC;
+            WHERE {where_sql}
+            ORDER BY sh.created_at DESC
+            {limit_clause};
             """,
-            (user_id,)
+            tuple(query_params)
         )
 
         history = cursor.fetchall()
+        total_pages = math.ceil(total / pp) if total > 0 and pp > 0 else 1
 
-        return [
+        formatted_history = [
             {
                 "id": h[0],
                 "job_id": h[1],
@@ -1339,6 +1680,14 @@ def get_swipe_history(
             }
             for h in history
         ]
+
+        return {
+            "history": formatted_history,
+            "total": total,
+            "page": p,
+            "per_page": pp,
+            "total_pages": total_pages,
+        }
 
     finally:
         cursor.close()

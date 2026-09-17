@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import API from "../services/api";
 
 function DiscoverJobs() {
@@ -9,7 +9,20 @@ function DiscoverJobs() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const perPage = 20;
+  const perPage = 50;
+
+  const isInitialMount = useRef(true);
+
+  // Automatically scroll to the top of the page when page changes
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [page]);
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -212,7 +225,7 @@ function DiscoverJobs() {
           placeholder="Search by title, company, or location..."
           className="discover-search-input"
         />
-        <button type="submit" className="primary-btn">
+        <button type="submit" className="primary-btn discover-search-btn">
           Search
         </button>
         {search && (
@@ -352,7 +365,7 @@ function DiscoverJobs() {
                       type="button"
                       className={`discover-save-card-btn ${isSaved ? "saved" : ""}`}
                       onClick={(e) => handleSave(job, e)}
-                      title={isSaved ? "Saved in History" : "Save Job"}
+                      title={isSaved ? "Saved" : "Save Job"}
                     >
                       {isSaved ? "🔖 Saved" : "🔖 Save"}
                     </button>
@@ -382,9 +395,13 @@ function DiscoverJobs() {
       {!loading && !error && totalPages > 1 && (
         <div className="discover-pagination">
           <button
+            type="button"
             className="secondary-btn"
             disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => {
+              setPage((p) => Math.max(1, p - 1));
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
           >
             ← Previous
           </button>
@@ -404,8 +421,12 @@ function DiscoverJobs() {
               return (
                 <button
                   key={pageNum}
+                  type="button"
                   className={`pagination-btn ${pageNum === page ? "active" : ""}`}
-                  onClick={() => setPage(pageNum)}
+                  onClick={() => {
+                    setPage(pageNum);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                 >
                   {pageNum}
                 </button>
@@ -414,9 +435,13 @@ function DiscoverJobs() {
           </div>
 
           <button
+            type="button"
             className="secondary-btn"
             disabled={page >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => {
+              setPage((p) => Math.min(totalPages, p + 1));
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
           >
             Next →
           </button>
@@ -525,7 +550,7 @@ function DiscoverJobs() {
                         <h4 className="modal-section-title" style={{ margin: 0 }}>
                           ATS Resume Compatibility Scan
                         </h4>
-                        <p style={{ margin: "4px 0 0", color: "#746c82", fontSize: "12.5px" }}>
+                        <p className="ats-modal-subtitle">
                           Analyze your uploaded resume against this specific position.
                         </p>
                       </div>
@@ -592,7 +617,7 @@ function DiscoverJobs() {
                 className="secondary-btn"
                 onClick={(e) => handleSave(selectedJob, e)}
               >
-                {savedJobIds.has(selectedJob.id) ? "✓ Saved in History" : "🔖 Save Job"}
+                {savedJobIds.has(selectedJob.id) ? "✓ Saved" : "🔖 Save Job"}
               </button>
 
               <div style={{ display: "flex", gap: "10px" }}>

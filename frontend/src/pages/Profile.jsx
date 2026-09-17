@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import API from "../services/api.js";
+import { clearRecommendationsCache } from "../services/cache.js";
 
 const EMPTY_PROFILE = {
   phone: "",
@@ -149,9 +150,10 @@ function Profile() {
         setMessage("Profile created successfully.");
       }
 
-      setProfile(payload);
-      setEditing(false);
-    } catch (err) {
+        setProfile(payload);
+        setEditing(false);
+        clearRecommendationsCache();
+      } catch (err) {
       if (err.response?.status === 401) {
         setError("Session expired. Please login again.");
       } else {
@@ -184,19 +186,6 @@ function Profile() {
           <p className="page-label">CANDIDATE PROFILE</p>
           <h1>Your Profile</h1>
         </div>
-
-        {exists && !editing && (
-          <button
-            className="primary-btn"
-            onClick={() => {
-              setMessage("");
-              setError("");
-              setEditing(true);
-            }}
-          >
-            Edit Profile
-          </button>
-        )}
       </div>
 
       {/* MESSAGES */}
@@ -207,14 +196,28 @@ function Profile() {
       {!editing && exists ? (
         <section className="profile-card">
           <div className="profile-card-header">
-            <div className="profile-avatar-large">SX</div>
-            <div>
-              <h2>Candidate Profile & Preferences</h2>
-              <p>{profile.location || "Location not added"}</p>
+            <div className="profile-card-header-left">
+              <div className="profile-avatar-large">SX</div>
+              <div>
+                <h2>Candidate Profile & Preferences</h2>
+                <p>{profile.location || "Location not added"}</p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              className="primary-btn profile-edit-btn"
+              onClick={() => {
+                setMessage("");
+                setError("");
+                setEditing(true);
+              }}
+            >
+              Edit Profile
+            </button>
           </div>
 
-          <div className="profile-details-grid">
+          <div className="profile-details-grid" style={{ alignItems: "start" }}>
             <ProfileInfo label="Phone Number" value={profile.phone} />
             <ProfileInfo label="Current Location" value={profile.location} />
             <ProfileInfo label="Education" value={profile.education} />
@@ -465,20 +468,9 @@ function Profile() {
 
           {/* ACTIONS */}
           <div className="profile-actions">
-            {exists && (
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={handleCancel}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-            )}
-
             <button
               type="submit"
-              className="primary-btn"
+              className="primary-btn profile-save-btn"
               disabled={
                 saving ||
                 ((profile.phone || "").length > 0 &&
@@ -491,6 +483,17 @@ function Profile() {
                 ? "Save Changes"
                 : "Create Profile"}
             </button>
+
+            {exists && (
+              <button
+                type="button"
+                className="secondary-btn profile-cancel-btn"
+                onClick={handleCancel}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+            )}
           </div>
         </form>
       )}
