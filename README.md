@@ -5,6 +5,7 @@
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2016-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Container-Docker%20%26%20Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/springboardmentor625/job-discovery-platform/tree/revanth-gatla)
 
 **SWIPE X** is an intelligent, modern job discovery and recommendation platform designed to eliminate recruitment fatigue. Combining a swipe-based card interface with a 70/20/10 AI matching algorithm, real-time ATS resume compatibility analysis, and a search catalog of over 33,000+ tech jobs, SWIPE X helps candidates find and evaluate career opportunities faster and smarter.
 

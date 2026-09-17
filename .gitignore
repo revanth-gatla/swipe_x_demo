@@ -255,5 +255,7 @@ frontend/dist/
 # Docker
 *.log
 
-# Dataset files (large CSVs)
-backend/data/
+# Dataset files (large raw CSVs)
+backend/data/*.csv
+backend/data/job_postings.csv
+!backend/data/swipe_x_dump.sql.gz

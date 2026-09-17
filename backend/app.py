@@ -44,22 +44,22 @@ if _frontend_url:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
-    allow_methods=[
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE",
-        "OPTIONS",
-    ],
-    allow_headers=[
-        "Authorization",
-        "Content-Type",
-    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.on_event("startup")
-def warm_up_catalog():
+def startup_event():
+    # 1. Auto-seed database with 33,000+ jobs if needed
+    try:
+        from auto_seed import seed_database
+        seed_database()
+    except Exception as e:
+        print("[Startup] Auto-seed warning:", e)
+
+    # 2. Warm up in-memory jobs catalog cache
     try:
         conn = get_db_connection()
         cur = conn.cursor()

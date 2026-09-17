@@ -16,6 +16,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
+    preDeployCommand: python auto_seed.py
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
@@ -23,7 +24,7 @@ services:
           name: swipe-x-db
           property: connectionString
       - key: GROQ_API_KEY
-        sync: false          # set manually in Render dashboard
+        sync: false
       - key: JWT_SECRET_KEY
         generateValue: true  # Render auto-generates a secure random string
       - key: FRONTEND_URL
