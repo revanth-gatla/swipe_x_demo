@@ -8,7 +8,7 @@ if (!rawUrl || rawUrl === "http://localhost:8000") {
     !window.location.hostname.includes("localhost") &&
     !window.location.hostname.includes("127.0.0.1")
   ) {
-    rawUrl = "https://swipe-x-backend.onrender.com";
+    rawUrl = "https://swipe-x-backend-pcb8.onrender.com";
   } else {
     rawUrl = "http://localhost:8000";
   }
