@@ -39,10 +39,14 @@ function Register() {
       navigate("/login");
 
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-        "Registration failed."
-      );
+      if (err.response?.status === 409) {
+        setError("This email is already registered. Please login instead.");
+      } else {
+        setError(
+          err.response?.data?.detail ||
+          "Registration failed. Please check your details."
+        );
+      }
     } finally {
       setLoading(false);
     }
