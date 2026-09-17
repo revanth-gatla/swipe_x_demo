@@ -1,502 +1,273 @@
-```# SWIPE X – Candidate Workflow
+# SWIPE X – Candidate Workflow & System Architecture
 
 ## 1. Overview
 
-The Candidate Workflow allows users to register, create their profile, upload and analyze their resume, discover AI-matched jobs, and manage job applications and saved jobs.
+**SWIPE X** is an AI-powered job discovery and recommendation platform designed to eliminate recruitment fatigue and streamline career exploration.
+
+By combining an intuitive swipe-based interaction deck, a weighted **70/20/10 AI recommendation engine**, a searchable catalog of **33,000+ real-world tech positions**, automated **ATS resume compatibility scanning**, and an adaptive **Dark/Light Mode UI**, SWIPE X delivers a high-impact, frictionless experience for job seekers.
 
 ---
 
-## 2. Complete Candidate Flow
+## 2. Complete Candidate Journey
 
-
-Register / Login
-       ↓
-Candidate Dashboard
-       ↓
-Profile
-       ↓
-Resume & ATS
-       ↓
-AI Job Matching
-       ↓
-Job Cards
-       ↓
-┌────────────┬────────────┬────────────┐
-│  ← LEFT    │  ↓ DOWN    │  RIGHT →   │
-│   SKIP     │   SAVE     │   APPLY    │
-└────────────┴────────────┴────────────┘
-       │           │            │
-       ↓           ↓            ↓
-    Next Job   Saved Jobs   Applications
-                              │
-                              ↓
-                       Application Status
-    
-## 3. Authentication
-
-The candidate first creates an account and logs in.
-
-Register
-   ↓
-Login
-   ↓
-Access Token
-   ↓
-Candidate Dashboard
-
---The authenticated candidate can access protected features such as Profile, Resume, AI Matching, Applications and Saved Jobs.
-
-4. Candidate Profile
-
-The candidate maintains their professional information:
-
-Phone Number
-Location
-Education
-Experience
-Skills
-About / Bio
-
-This information helps build the candidate's profile and contributes to job matching.
-
-## 5 - Resume&ATS
-
-The candidate uploads a PDF resume.
-
-Upload Resume
-      ↓
-Parse Resume
-      ↓
-Extract Skills & Experience
-      ↓
-ATS Analysis
-      ↓
-ATS Score
-
-The extracted resume information is used by the AI job-matching workflow.
-
-----
-##6. AI Job Matching
-
-The system compares the candidate's profile/resume information with available jobs.
-
-The matching process considers:
-
-Candidate skills
-Required job skills
-Candidate experience
-Required experience
-Job title and description relevance
-
-Each recommended job receives a match percentage and displays matched and missing skills.
-------
-
-##7. Swipe-Based Job Interaction
-
-The candidate interacts with job cards by dragging them.
-
-← Left: Skip
-Drag Job Card ←
-       ↓
-     SKIP
-       ↓
-Next Job
-
-The job is skipped and no application or saved-job record is created.
-
-↓ Down: Save
-Drag Job Card ↓
-       ↓
-     SAVE
-       ↓
-Saved Jobs
-
-The job is stored in the candidate's saved jobs.
-
-Backend API:
-POST /jobs/{job_id}/save
-
-→ Right: Apply
-Drag Job Card →
-       ↓
-     APPLY
-       ↓
-Applications
-
-Backend API:
-POST /jobs/{job_id}/apply
-
-The initial application status is: Applied
-
-----
-##8. Applications
-
-The Applications section shows all jobs applied for by the candidate.
-
-Each application contains:
-
-Job
-Company
-Application ID
-Applied Date
-Status
--
-Applications are retrieved using:
-GET /applications
-
----
-##9.The Saved Jobs section contains jobs saved by the candidate.
-
-Candidates can:
-
-View saved jobs
-Apply for a saved job
-Remove a saved job
-
-Backend APIs(used):
-GET    /saved-jobs
-POST   /jobs/{job_id}/apply
-DELETE /jobs/{job_id}/save
-
-
-----
-##10. Core Candidate Workflow
-
-The complete candidate-side workflow is:
-                    CANDIDATE
-                       │
-                       ▼
-                 REGISTER / LOGIN
-                       │
-                       ▼
-                    PROFILE
-                       │
-                       ▼
-                  RESUME & ATS
-                       │
-                       ▼
-                 AI JOB MATCHING
-                       │
-                       ▼
-                    JOB CARD
-                       │
-          ┌────────────┼────────────┐
-          │            │            │
-          ▼            ▼            ▼
-       ← LEFT       ↓ DOWN       RIGHT →
-        SKIP         SAVE          APPLY
-          │            │            │
-          ▼            ▼            ▼
-      NEXT JOB    SAVED JOBS   APPLICATIONS
-                       │
-                       ▼
-                     APPLY
-                       │
-                       ▼
-                 APPLICATIONS
-
-
-----------
-MAIN CANDIDATE APIS(BACKEND):
-| Action           | API                          |
-| ---------------- | ---------------------------- |
-| Register         | `POST /register`             |
-| Login            | `POST /login`                |
-| Profile          | `GET/POST/PUT /profile`      |
-| Get Jobs         | `GET /jobs`                  |
-| AI Matches       | `GET /recommended-jobs`      |
-| Apply            | `POST /jobs/{job_id}/apply`  |
-| Applications     | `GET /applications`          |
-| Save Job         | `POST /jobs/{job_id}/save`   |
-| Saved Jobs       | `GET /saved-jobs`            |
-| Remove Saved Job | `DELETE /jobs/{job_id}/save` |
-
-
-
-####The main purpose of the Candidate Workflow is to provide a simple AI-powered, swipe-based job discovery and application experience.```
-
+```text
+                           +---------------------------+
+                           |    Candidate Register     |
+                           +-------------+-------------+
+                                         |
+                                         v
+                           +---------------------------+
+                           |      Candidate Login      |
+                           +-------------+-------------+
+                                         |
+                                         v
+                           +---------------------------+
+                           |  Candidate Profile Setup  |
+                           |  (Skills, Target Titles)  |
+                           +-------------+-------------+
+                                         |
+                                         v
+                           +---------------------------+
+                           |  Upload & Parse Resume    |
+                           |  (PDF Extraction & ATS)   |
+                           +-------------+-------------+
+                                         |
+                                         v
+                           +---------------------------+
+                           |   70/20/10 AI Matching    |
+                           |   (Recommendations Deck)  |
+                           +-------------+-------------+
+                                         |
+                +------------------------+------------------------+
+                |                                                 |
+                v                                                 v
+    +-----------------------+                         +-----------------------+
+    | Interactive SwipeDeck |                         | Discover Jobs Catalog |
+    |   (Swipe Card UI)     |                         | (33k+ Search & Filter)|
+    +-----------+-----------+                         +-----------+-----------+
+                |                                                 |
+                +------------------------+------------------------+
+                                         |
+                                         v
+                           +---------------------------+
+                           | View Complete Job Details |
+                           |   (Internal ATS Scan)     |
+                           +-------------+-------------+
+                                         |
+        +--------------------------------+--------------------------------+
+        |                                |                                |
+        v                                v                                v
+  ← SWIPE LEFT                     ↓ SWIPE DOWN                     SWIPE RIGHT →
+    [ PASS ]                         [ SAVE ]                       [ INTERESTED ]
+        |                                |                                |
+        v                                v                                v
+  Next Recommendation               Saved Jobs                     Applied / High Match
+        |                                |                                |
+        +--------------------------------+--------------------------------+
+                                         |
+                                         v
+                           +---------------------------+
+                           |    Swipe History Log      |
+                           |   (Filter & Application)  |
+                           +---------------------------+
 ```
----->To run the application using docker:
 
-## 11. How to Run the Project Using Docker
+---
 
-SwipeX can be run completely using Docker and Docker Compose. Follow the steps below to set up and run the application.
+## 3. Core Modules & Candidate Features
 
-### Step 1: Install Docker
+### 3.1 Authentication & Security
+- **Registration**: Quick candidate registration with full name, email, and secure password.
+- **Login & JWT**: Generates signed JSON Web Tokens (JWT) for stateless, secure session authorization.
+- **Protected Routes**: Candidates securely access their personal profile, uploaded resumes, AI recommendations, and application history.
 
-Install and start **Docker Desktop** on your system.
+### 3.2 Candidate Profile
+- **Career Preferences**: Target job titles, industry domain, and preferred workplace type (Remote / Hybrid / On-site).
+- **Qualifications**: Experience level (years of experience as numeric representation) and educational background.
+- **Skills Inventory**: Comma-separated list of technical proficiencies, frameworks, and programming languages.
+- **Bio & Contact Details**: Professional overview, location, and contact information.
 
-Verify that Docker is installed:
+### 3.3 Resume Hub & Automated Parsing
+- **PDF Extraction**: Extracts raw text cleanly from uploaded PDF resumes using high-performance parsing (`fitz` / PyMuPDF).
+- **Automated Skill Extraction**: Identifies core competencies, libraries, tools, and years of experience automatically.
+- **Candidate Re-use**: Uploaded resume data is persistently stored and reused across recommendation feeds and ATS scans without re-uploading.
 
+### 3.4 70/20/10 AI Job Matching Engine
+Recommendations are dynamically scored using a hybrid recommendation algorithm:
+1. **70% Content Similarity**: Vector-based cosine similarity and TF-IDF comparison between candidate skills/resume and job requirements.
+2. **20% Interaction Feedback**: Adaptive weights based on historical swipe activity (reinforcing categories the user marks as *Interested*, penalizing patterns marked as *Pass*).
+3. **10% Role & Seniority Alignment**: Exact and fuzzy matching on target job title, seniority, and years of experience.
+
+Each recommended card displays:
+- Overall match percentage (0–100%)
+- Matched candidate skills (highlighted in green)
+- Missing job requirements (highlighted in amber/red)
+- Key metadata: Company, location, employment type, salary estimates.
+
+### 3.5 Interactive Swipe-Based Interaction
+Candidates interact with AI-matched cards with responsive drag gestures, clicks, or keyboard navigation:
+- **Swipe Right (`→`) / Click Interested**: Marks the job as interested / applied. Reinforces the AI model to recommend similar roles.
+- **Swipe Left (`←`) / Click Pass**: Skips the job. The recommendation engine downvotes similar roles in future cycles.
+- **Swipe Down (`↓`) / Click Save**: Adds the job to the candidate's Saved Jobs tab for later evaluation.
+
+### 3.6 Internal & On-Demand ATS Resume Compatibility Scan
+- Whenever a candidate clicks **"View Complete Details"** on any job card in either the **Recommended Jobs** or **Discover Jobs** section, an automated ATS scan runs internally against their current active resume.
+- **Low User Friction**: Candidates do not need to manually trigger separate scans or re-upload resumes.
+- **Cached Performance**: Once calculated, the scan is cached in the database for instant retrieval.
+- **Comprehensive ATS Report**:
+  - **ATS Compatibility Score** (0–100%)
+  - **Identified Keyword Matches**
+  - **Missing Critical Skills**
+  - **Tailored Improvement Recommendations** to optimize the candidate's resume for that specific role.
+
+### 3.7 Discover Jobs Catalog (33,000+ Jobs)
+- Comprehensive searchable directory populated with 33,000+ real-world tech positions.
+- **Instant Search**: Filter by job title, company name, or geographic location in real time.
+- **Paginated Grid View**: Clean browsing with direct external apply links and quick-save buttons.
+- **Complete Details Modal**: Full job description with embedded ATS compatibility scanner.
+
+### 3.8 Swipe History & Interaction Tracking
+- Chronological timeline of every interaction performed by the candidate.
+- Filter interactions by status: **All**, **Interested**, **Saved**, or **Passed**.
+- Direct application links to finalize pending applications.
+
+### 3.9 Adaptive Dark & Light Modes
+- User-selectable mode toggle located in the navigation header (left of the user profile).
+- High-contrast typography and borderless swipe indicators tailored for Dark Mode.
+- Complete adaptive styling across all modals, ATS reports, and job cards.
+- Persistent state saved in browser storage.
+
+---
+
+## 4. System Architecture
+
+```text
++--------------------------------------------------------------------------------+
+|                               FRONTEND LAYER                                   |
+|  React 19 + Vite | React Router DOM | Axios Interceptors | Modern CSS3 Tokens  |
+|                                                                                |
+|  [ Recommended Jobs ]   [ Discover Jobs ]   [ Resume Hub ]   [ Profile ]       |
+|    (Swipe Gesture Deck)   (33k+ Catalog)     (PDF Upload)     (Preferences)    |
++---------------------------------------+----------------------------------------+
+                                        |
+                                        | REST API / JSON (Bearer JWT Auth)
+                                        v
++--------------------------------------------------------------------------------+
+|                                BACKEND LAYER                                   |
+|                    FastAPI (Python 3.11+) + Uvicorn Worker                     |
+|                                                                                |
+|  +---------------------+  +----------------------+  +-----------------------+  |
+|  |   Auth & Security   |  | 70/20/10 AI Matcher  |  | ATS Scanner (Groq)    |  |
+|  |   (JWT, Bcrypt)     |  | (TF-IDF & Cosine)    |  | (LLM + Heuristics)    |  |
+|  +---------------------+  +----------------------+  +-----------------------+  |
+|  +---------------------+  +----------------------+  +-----------------------+  |
+|  | Resume Extraction   |  | Catalog & Search     |  | Swipe History Tracker |  |
+|  | (fitz / PyMuPDF)    |  | (Pagination / Index) |  | (Activity Log)        |  |
+|  +---------------------+  +----------------------+  +-----------------------+  |
++---------------------------------------+----------------------------------------+
+                                        |
+                                        | SQL Queries / Connection Pooling
+                                        v
++--------------------------------------------------------------------------------+
+|                               DATABASE LAYER                                   |
+|                            PostgreSQL 16 Engine                                |
+|                                                                                |
+|  - users                 - candidate_profiles     - resumes                    |
+|  - jobs (33k+ dataset)   - user_swipes            - ats_scans                  |
++--------------------------------------------------------------------------------+
+```
+
+---
+
+## 5. Main Candidate API Endpoints
+
+All protected endpoints require the HTTP header:  
+`Authorization: Bearer <access_token>`
+
+| Method | Endpoint | Description | Auth Required |
+|:---|:---|:---|:---:|
+| `POST` | `/register` | Register a new candidate account | No |
+| `POST` | `/login` | Authenticate and retrieve JWT access token | No |
+| `GET` | `/` | API status and health check | No |
+| `GET` | `/test-db` | Database connection validation | No |
+| `POST` | `/profile` | Create initial candidate profile | Yes |
+| `GET` | `/profile` | Retrieve candidate profile and skills | Yes |
+| `PUT` | `/profile` | Update candidate profile attributes | Yes |
+| `POST` | `/resume/upload` | Upload PDF resume, extract text and parse skills | Yes |
+| `GET` | `/resume` | Retrieve parsed resume metadata and skills | Yes |
+| `GET` | `/recommended-jobs` | Fetch AI-matched jobs (70/20/10 algorithm) | Yes |
+| `GET` | `/discover-jobs` | Search & paginate 33,000+ jobs catalog | Yes |
+| `GET` | `/jobs/{job_id}` | Fetch full details for a single job | Yes |
+| `POST` | `/swipe` | Record swipe action (`interested`, `save`, `pass`) | Yes |
+| `GET` | `/swipe-history` | Fetch history of candidate interactions | Yes |
+| `POST` | `/ats/analyze/{job_id}` | Trigger ATS resume compatibility scan | Yes |
+| `GET` | `/ats/report/{job_id}` | Retrieve cached ATS compatibility report | Yes |
+
+---
+
+## 6. How to Run the Project Using Docker
+
+SWIPE X is fully containerized using Docker and Docker Compose for seamless deployment across environments.
+
+### Step 1: Verify Prerequisites
+Ensure Docker and Docker Compose are installed:
 ```bash
 docker --version
-```
-
-Verify Docker Compose:
-
-```bash
 docker compose version
 ```
 
-Make sure Docker Desktop is running before continuing.
-
----
-
-### Step 2: Clone the Repository
-
-Clone the SwipeX repository:
-
-```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-```
-
-Navigate to the project directory:
-
-```bash
-cd <PROJECT_FOLDER_NAME>
-```
-
----
-
-### Step 3: Configure Environment Variables
-
-Create the required `.env` files according to the project's configuration.
-
-The backend environment should contain the required database configuration, secret key, and GROQ API key.
-
-Example:
-
+### Step 2: Configure Environment Variables
+Ensure the backend environment file exists at `backend/.env`:
 ```env
-DATABASE_URL=<YOUR_DATABASE_URL>
-SECRET_KEY=<YOUR_SECRET_KEY>
-GROQ_API_KEY=<YOUR_GROQ_API_KEY>
+GROQ_API_KEY=<your_groq_api_key>
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=swipe_x
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_secure_password
+JWT_SECRET_KEY=your_jwt_secret_key
 ```
 
-The frontend environment should contain the backend API URL.
-
-Example:
-
-```env
-VITE_API_URL=http://localhost:<BACKEND_PORT>
-```
-
-> Never commit `.env` files or API keys to the GitHub repository.
-
----
-
-### Step 4: Build the Docker Images
-
-From the root directory of the project, run:
-
+### Step 3: Build Docker Containers
+Build the container images from the root directory:
 ```bash
 docker compose build
 ```
 
-This builds the Docker images required by the SwipeX application.
-
----
-
-### Step 5: Start the Application
-
-Start all configured services using:
-
-```bash
-docker compose up
-```
-
-To run the application in the background:
-
+### Step 4: Launch Application Services
+Start all services (PostgreSQL, Backend API, and Frontend Nginx) in detached mode:
 ```bash
 docker compose up -d
 ```
 
-Docker Compose will start the services defined in the `docker-compose.yml` file.
-
----
-
-### Step 6: Check Running Containers
-
-Verify that all required containers are running:
-
+### Step 5: Verify Running Containers
+Check that all three containers are healthy:
 ```bash
 docker ps
 ```
 
-The SwipeX frontend, backend, database, and other configured services should appear in the list.
+You should see:
+- `swipe-x-postgres` (PostgreSQL 16)
+- `swipe-x-backend` (FastAPI on port 8000)
+- `swipe-x-frontend` (React + Nginx on port 5173 or 80)
 
----
-
-### Step 7: Check Container Logs
-
-If required, view the application logs using:
-
-```bash
-docker compose logs
-```
-
-To view logs for a specific service:
-
-```bash
-docker compose logs <service_name>
-```
-
----
-
-### Step 8: Access SwipeX
-
-Once all containers are running, open the frontend in your browser:
-
+### Step 6: Access the Application
+Open your browser and navigate to:
 ```text
-http://localhost:<FRONTEND_PORT>
-```
-
-Use the frontend port configured in the project's `docker-compose.yml` file.
-
----
-
-### Step 9: Test the Candidate Workflow
-
-After opening SwipeX:
-
-```text
-Register
-   ↓
-Login
-   ↓
-Candidate Profile
-   ↓
-Upload Resume
-   ↓
-Resume Parsing & ATS
-   ↓
-AI Job Matching
-   ↓
-Recommended Job Cards
-   ↓
- ┌─────────┬─────────┬─────────┐
- │  SKIP   │  SAVE   │  APPLY  │
- └─────────┴─────────┴─────────┘
-```
-
-Verify that the candidate can:
-
-* Register and login
-* Complete the profile
-* Upload a resume
-* Generate the ATS analysis
-* View the ATS score
-* View AI-recommended jobs
-* View job match percentages
-* Skip jobs
-* Save jobs
-* Apply for jobs
-* View saved jobs
-* View applications
-
----
-
-### Step 10: Stop the Application
-
-To stop the running Docker containers:
-
-```bash
-docker compose down
-```
-
-This stops and removes the containers while keeping the Docker images and persistent volumes.
-
----
-
-### Step 11: Restart the Application
-
-If the Docker images have already been built, start the application again using:
-
-```bash
-docker compose up -d
-```
-
-If code or Docker configuration has been changed and the images need to be rebuilt:
-
-```bash
-docker compose up --build -d
+http://localhost:5173
 ```
 
 ---
 
-### Step 12: Useful Docker Commands
+## 7. Useful Docker Commands
 
-**Build the application:**
-
-```bash
-docker compose build
-```
-
-**Start the application:**
-
-```bash
-docker compose up
-```
-
-**Start in background:**
-
-```bash
-docker compose up -d
-```
-
-**Rebuild and start:**
-
-```bash
-docker compose up --build -d
-```
-
-**Check running containers:**
-
-```bash
-docker ps
-```
-
-**View logs:**
-
-```bash
-docker compose logs
-```
-
-**Stop the application:**
-
-```bash
-docker compose down
-```
-
-**Stop and remove volumes:**
-
-```bash
-docker compose down -v
-```
-
-> Use `docker compose down -v` carefully because removing volumes may delete persistent local database data.
-
----
-
-### Docker Execution Flow
-
-```text
-Clone Repository
-       ↓
-Configure .env
-       ↓
-Start Docker Desktop
-       ↓
-docker compose build
-       ↓
-docker compose up -d
-       ↓
-Docker Containers Start
-       ↓
-Frontend + Backend + Database
-       ↓
-Open localhost URL
-       ↓
-SwipeX Application
-
-
-
+| Action | Command |
+|---|---|
+| Start services | `docker compose up -d` |
+| View combined logs | `docker compose logs -f` |
+| View backend logs | `docker compose logs -f backend` |
+| View frontend logs | `docker compose logs -f frontend` |
+| View database logs | `docker compose logs -f postgres` |
+| Rebuild and start | `docker compose up --build -d` |
+| Stop services | `docker compose down` |
+| Stop and remove volumes | `docker compose down -v` |
