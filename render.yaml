@@ -31,7 +31,7 @@ services:
         fromService:
           type: web
           name: swipe-x-frontend
-          property: url
+          property: host
       - key: PYTHON_VERSION
         value: "3.11.12"
 
@@ -39,7 +39,6 @@ services:
   - type: web
     name: swipe-x-frontend
     runtime: static
-    plan: free
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
@@ -48,7 +47,7 @@ services:
         fromService:
           type: web
           name: swipe-x-backend
-          property: url
+          property: host
     routes:
       - type: rewrite
         source: /*
