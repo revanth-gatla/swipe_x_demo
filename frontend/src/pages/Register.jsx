@@ -26,26 +26,42 @@ function Register() {
     try {
       await axios.post(
         `${API_URL}/register`,
-        null,
+        {
+          name: name.trim(),
+          email: email.trim(),
+          password,
+        },
         {
           params: {
-            name,
-            email,
+            name: name.trim(),
+            email: email.trim(),
             password,
           },
         }
       );
 
       navigate("/login");
-
     } catch (err) {
-      if (err.response?.status === 409) {
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail;
+      const detailStr =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d.detail).join(", ")
+          : "";
+
+      if (
+        status === 409 ||
+        detailStr.toLowerCase().includes("already registered")
+      ) {
         setError("This email is already registered. Please login instead.");
+      } else if (detailStr) {
+        setError(detailStr);
+      } else if (!err.response) {
+        setError("Unable to connect to server. Please check your network connection or try again.");
       } else {
-        setError(
-          err.response?.data?.detail ||
-          "Registration failed. Please check your details."
-        );
+        setError("Registration failed. Please check your details.");
       }
     } finally {
       setLoading(false);

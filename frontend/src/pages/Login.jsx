@@ -48,10 +48,34 @@ function Login() {
 
       navigate("/dashboard");
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-        "Login failed. Please check your credentials."
-      );
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail;
+      const detailStr =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+          ? detail.map((d) => d.msg || d.detail).join(", ")
+          : "";
+
+      if (
+        status === 404 ||
+        detailStr.toLowerCase().includes("not registered") ||
+        detailStr.toLowerCase().includes("does not exist") ||
+        detailStr.toLowerCase().includes("not found")
+      ) {
+        setError("Email not registered. Please create an account.");
+      } else if (
+        status === 401 &&
+        detailStr.toLowerCase().includes("password")
+      ) {
+        setError("Incorrect password. Please try again.");
+      } else if (detailStr) {
+        setError(detailStr);
+      } else if (!err.response) {
+        setError("Unable to connect to server. Please check your network connection or try again.");
+      } else {
+        setError("Login failed. Please check your credentials.");
+      }
     } finally {
       setLoading(false);
     }

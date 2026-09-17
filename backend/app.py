@@ -107,6 +107,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+
+
 class ProfileRequest(BaseModel):
     phone: str = ""
     location: str = ""
@@ -161,10 +167,24 @@ def test_db():
 
 @app.post("/register")
 def register(
-    name: str,
-    email: EmailStr,
-    password: str
+    data: Optional[RegisterRequest] = None,
+    name: Optional[str] = None,
+    email: Optional[EmailStr] = None,
+    password: Optional[str] = None,
 ):
+    final_name = (data.name if data and data.name else name) or ""
+    final_email = (data.email if data and data.email else email) or ""
+    final_password = (data.password if data and data.password else password) or ""
+
+    final_name = str(final_name).strip()
+    final_email = str(final_email).strip()
+
+    if not final_name or not final_email or not final_password:
+        raise HTTPException(
+            status_code=422,
+            detail="Name, email, and password are required."
+        )
+
     connection = get_db_connection()
     cursor = connection.cursor()
 
@@ -173,9 +193,9 @@ def register(
             """
             SELECT id
             FROM users
-            WHERE email = %s;
+            WHERE LOWER(email) = LOWER(%s);
             """,
-            (email,)
+            (final_email,)
         )
 
         existing_user = cursor.fetchone()
@@ -183,10 +203,10 @@ def register(
         if existing_user:
             raise HTTPException(
                 status_code=409,
-                detail="Email already registered"
+                detail="This email is already registered. Please login instead."
             )
 
-        hashed_password = pwd_context.hash(password)
+        hashed_password = pwd_context.hash(final_password)
 
         cursor.execute(
             """
@@ -196,8 +216,8 @@ def register(
             RETURNING id;
             """,
             (
-                name,
-                email,
+                final_name,
+                final_email,
                 hashed_password
             )
         )
@@ -226,17 +246,17 @@ def login(data: LoginRequest):
             """
             SELECT id, name, password
             FROM users
-            WHERE email = %s;
+            WHERE LOWER(email) = LOWER(%s);
             """,
-            (data.email,)
+            (data.email.strip(),)
         )
 
         user = cursor.fetchone()
 
         if not user:
             raise HTTPException(
-                status_code=401,
-                detail="User does not exist"
+                status_code=404,
+                detail="Email not registered"
             )
 
         user_id = user[0]
