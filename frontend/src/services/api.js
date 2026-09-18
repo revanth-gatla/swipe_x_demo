@@ -1,13 +1,20 @@
 import axios from "axios";
 
 let rawUrl = import.meta.env.VITE_API_URL;
-if (!rawUrl || rawUrl === "http://localhost:8000" || rawUrl.includes("dashboard.render.com")) {
-  if (
-    typeof window !== "undefined" &&
-    window.location.hostname &&
-    !window.location.hostname.includes("localhost") &&
-    !window.location.hostname.includes("127.0.0.1")
-  ) {
+const isProd =
+  typeof window !== "undefined" &&
+  window.location.hostname &&
+  !window.location.hostname.includes("localhost") &&
+  !window.location.hostname.includes("127.0.0.1");
+
+if (
+  !rawUrl ||
+  rawUrl === "http://localhost:8000" ||
+  rawUrl.includes("dashboard.render.com") ||
+  rawUrl.includes("trycloudflare.com") ||
+  (isProd && !rawUrl.includes("onrender.com"))
+) {
+  if (isProd) {
     rawUrl = "https://swipe-x-backend-pcb8.onrender.com";
   } else {
     rawUrl = "http://localhost:8000";
