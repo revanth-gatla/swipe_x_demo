@@ -103,7 +103,31 @@ def seed_database():
                                 # Skip owner commands
                                 if "OWNER TO" in sql.upper():
                                     continue
-                                cur.execute(sql)
+                                # Skip SET commands for unsupported parameters
+                                sql_upper = sql.upper()
+                                if sql_upper.startswith("SET ") and any(
+                                    p in sql_upper for p in [
+                                        "TRANSACTION_TIMEOUT",
+                                        "IDLE_IN_TRANSACTION_SESSION_TIMEOUT",
+                                        "LOCK_TIMEOUT",
+                                        "STATEMENT_TIMEOUT",
+                                    ]
+                                ):
+                                    continue
+                                try:
+                                    cur.execute(sql)
+                                except Exception as stmt_err:
+                                    err_str = str(stmt_err).lower()
+                                    # Non-fatal errors: skip and continue
+                                    if any(k in err_str for k in [
+                                        "already exists",
+                                        "duplicate key",
+                                        "unrecognized configuration parameter",
+                                    ]):
+                                        conn.rollback()
+                                        conn.autocommit = False
+                                        continue
+                                    raise
 
         # Synchronize PostgreSQL sequences so new inserts don't collide with existing IDs
         for table in ["users", "jobs", "candidate_profiles", "resumes", "swipe_history", "ats_reports"]:
