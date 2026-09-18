@@ -50,6 +50,79 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
+    # 0. Ensure essential tables exist (CREATE IF NOT EXISTS)
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    password TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS jobs (
+                    id SERIAL PRIMARY KEY,
+                    title VARCHAR(500),
+                    company VARCHAR(500),
+                    location VARCHAR(500),
+                    description TEXT,
+                    salary VARCHAR(255),
+                    job_type VARCHAR(100),
+                    experience_level VARCHAR(100),
+                    skills TEXT,
+                    posted_date VARCHAR(100),
+                    application_url TEXT,
+                    source VARCHAR(100),
+                    work_mode VARCHAR(100),
+                    industry VARCHAR(255),
+                    company_size VARCHAR(100),
+                    benefits TEXT
+                );
+                CREATE TABLE IF NOT EXISTS candidate_profiles (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    phone VARCHAR(50),
+                    location VARCHAR(255),
+                    education TEXT,
+                    experience_years FLOAT DEFAULT 0,
+                    skills TEXT,
+                    bio TEXT,
+                    preferred_roles TEXT,
+                    preferred_locations TEXT,
+                    career_interests TEXT,
+                    work_mode_preference VARCHAR(100)
+                );
+                CREATE TABLE IF NOT EXISTS resumes (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    filename VARCHAR(500),
+                    extracted_text TEXT,
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS swipe_history (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    job_id INTEGER REFERENCES jobs(id),
+                    action VARCHAR(20),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS ats_reports (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    job_id INTEGER,
+                    score FLOAT,
+                    feedback TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+        conn.commit()
+        conn.close()
+        print("[Startup] Essential tables ensured.")
+    except Exception as e:
+        print("[Startup] Table creation warning:", e)
+
     # 1. Auto-seed database with 33,000+ jobs if needed
     try:
         from auto_seed import seed_database
