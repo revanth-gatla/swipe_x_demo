@@ -225,6 +225,19 @@ def get_user_id(
             detail="Invalid or expired token"
         )
 
+    # Validate that user actually exists in the database
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE id = %s;", (user_id,))
+            if not cur.fetchone():
+                raise HTTPException(
+                    status_code=401,
+                    detail="Session expired. Please log out and log in again."
+                )
+    finally:
+        conn.close()
+
     return user_id
 
 
@@ -474,11 +487,7 @@ def login(data: LoginRequest):
 # Profile CRUD (with new preference fields)
 # ---------------------------------------------------------------------------
 
-@app.post("/profile")
-def create_profile(
-    profile: ProfileRequest,
-    user_id: int = Depends(get_user_id)
-):
+def _upsert_candidate_profile(profile: ProfileRequest, user_id: int):
     connection = get_db_connection()
     cursor = connection.cursor()
 
@@ -501,36 +510,62 @@ def create_profile(
             )
             VALUES
             (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET
+                phone = EXCLUDED.phone,
+                location = EXCLUDED.location,
+                education = EXCLUDED.education,
+                experience_years = EXCLUDED.experience_years,
+                skills = EXCLUDED.skills,
+                bio = EXCLUDED.bio,
+                preferred_roles = EXCLUDED.preferred_roles,
+                preferred_locations = EXCLUDED.preferred_locations,
+                career_interests = EXCLUDED.career_interests,
+                work_mode_preference = EXCLUDED.work_mode_preference
             RETURNING id;
             """,
             (
                 user_id,
-                profile.phone,
-                profile.location,
-                profile.education,
-                profile.experience_years,
-                profile.skills,
-                profile.bio,
-                profile.preferred_roles,
-                profile.preferred_locations,
-                profile.career_interests,
-                profile.work_mode_preference,
+                profile.phone or "",
+                profile.location or "",
+                profile.education or "",
+                profile.experience_years or 0,
+                profile.skills or "",
+                profile.bio or "",
+                profile.preferred_roles or "",
+                profile.preferred_locations or "",
+                profile.career_interests or "",
+                profile.work_mode_preference or "",
             )
         )
 
-        profile_id = cursor.fetchone()[0]
+        row = cursor.fetchone()
+        profile_id = row[0] if row else user_id
 
         connection.commit()
         invalidate_recommendation_cache(user_id)
 
         return {
-            "message": "Profile created successfully",
+            "message": "Profile saved successfully",
             "profile_id": profile_id
         }
-
+    except Exception as e:
+        connection.rollback()
+        print(f"[Save Profile Error] user_id={user_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not save profile: {str(e)}"
+        )
     finally:
         cursor.close()
         connection.close()
+
+
+@app.post("/profile")
+def create_profile(
+    profile: ProfileRequest,
+    user_id: int = Depends(get_user_id)
+):
+    return _upsert_candidate_profile(profile, user_id)
 
 
 @app.get("/profile")
@@ -569,12 +604,12 @@ def get_profile(
             )
 
         return {
-            "phone": profile[0],
-            "location": profile[1],
-            "education": profile[2],
+            "phone": profile[0] or "",
+            "location": profile[1] or "",
+            "education": profile[2] or "",
             "experience_years": float(profile[3]) if profile[3] is not None else 0,
-            "skills": profile[4],
-            "bio": profile[5],
+            "skills": profile[4] or "",
+            "bio": profile[5] or "",
             "preferred_roles": profile[6] or "",
             "preferred_locations": profile[7] or "",
             "career_interests": profile[8] or "",
@@ -591,61 +626,7 @@ def update_profile(
     profile: ProfileRequest,
     user_id: int = Depends(get_user_id)
 ):
-    connection = get_db_connection()
-    cursor = connection.cursor()
-
-    try:
-        cursor.execute(
-            """
-            UPDATE candidate_profiles
-            SET
-                phone = %s,
-                location = %s,
-                education = %s,
-                experience_years = %s,
-                skills = %s,
-                bio = %s,
-                preferred_roles = %s,
-                preferred_locations = %s,
-                career_interests = %s,
-                work_mode_preference = %s
-            WHERE user_id = %s
-            RETURNING id;
-            """,
-            (
-                profile.phone,
-                profile.location,
-                profile.education,
-                profile.experience_years,
-                profile.skills,
-                profile.bio,
-                profile.preferred_roles,
-                profile.preferred_locations,
-                profile.career_interests,
-                profile.work_mode_preference,
-                user_id,
-            )
-        )
-
-        result = cursor.fetchone()
-
-        if not result:
-            raise HTTPException(
-                status_code=404,
-                detail="Profile not found"
-            )
-
-        connection.commit()
-        invalidate_recommendation_cache(user_id)
-
-        return {
-            "message": "Profile updated successfully",
-            "profile_id": result[0]
-        }
-
-    finally:
-        cursor.close()
-        connection.close()
+    return _upsert_candidate_profile(profile, user_id)
 
 
 # ---------------------------------------------------------------------------

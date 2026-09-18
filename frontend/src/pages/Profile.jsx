@@ -153,13 +153,12 @@ function Profile() {
         setProfile(payload);
         setEditing(false);
         clearRecommendationsCache();
-      } catch (err) {
       if (err.response?.status === 401) {
         setError("Session expired. Please login again.");
       } else {
-        setError(
-          err.response?.data?.detail || "Could not save profile."
-        );
+        const detail = err.response?.data?.detail;
+        const msg = typeof detail === "string" ? detail : (detail?.[0]?.msg || err.message || "Could not save profile.");
+        setError(msg);
       }
     } finally {
       setSaving(false);
