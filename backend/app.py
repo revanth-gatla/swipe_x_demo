@@ -198,6 +198,30 @@ def db_status():
         return {"status": "error", "detail": str(e), "traceback": traceback.format_exc()}
 
 
+@app.get("/seed-trigger")
+def seed_trigger():
+    """Manually trigger database seed if tables are missing."""
+    try:
+        from auto_seed import seed_database
+        result = seed_database()
+        # Re-sync sequences after seed
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                for table in ["users", "jobs", "candidate_profiles", "resumes", "swipe_history", "ats_reports"]:
+                    try:
+                        cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE(max(id), 1)) FROM {table};")
+                    except Exception:
+                        pass
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+        return {"status": "ok", "seeded": result}
+    except Exception as e:
+        return {"status": "error", "detail": str(e), "traceback": traceback.format_exc()}
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     print(f"[Unhandled Error] {request.method} {request.url}: {exc}")
