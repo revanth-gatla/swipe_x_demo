@@ -1,0 +1,7 @@
+backend
+venv
+node_modules
+cloudflared.exe
+*.sql
+*.sql.gz
+.git

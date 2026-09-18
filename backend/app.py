@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from database import get_db_connection
 from passlib.context import CryptContext
@@ -56,7 +57,21 @@ def startup_event():
     except Exception as e:
         print("[Startup] Auto-seed warning:", e)
 
-    # 2. Warm up in-memory jobs catalog cache
+    # 2. Always synchronize PostgreSQL sequences on boot
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            for table in ["users", "jobs", "candidate_profiles", "resumes", "swipe_history", "ats_reports"]:
+                try:
+                    cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE(max(id), 1)) FROM {table};")
+                except Exception:
+                    pass
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("[Startup] Sequence sync warning:", e)
+
+    # 3. Warm up in-memory jobs catalog cache
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -161,6 +176,36 @@ def test_db():
     return {
         "database": result[0]
     }
+
+
+@app.get("/db-status")
+def db_status():
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+            tables = [r[0] for r in cur.fetchall()]
+            counts = {}
+            for t in tables:
+                try:
+                    cur.execute(f"SELECT COUNT(*) FROM {t};")
+                    counts[t] = cur.fetchone()[0]
+                except Exception as te:
+                    counts[t] = str(te)
+        conn.close()
+        return {"status": "ok", "tables": tables, "counts": counts}
+    except Exception as e:
+        return {"status": "error", "detail": str(e), "traceback": traceback.format_exc()}
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"[Unhandled Error] {request.method} {request.url}: {exc}")
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": traceback.format_exc()}
+    )
 
 
 # ---------------------------------------------------------------------------

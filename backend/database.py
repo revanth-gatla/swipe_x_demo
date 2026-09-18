@@ -21,7 +21,10 @@ def get_db_connection():
         if database_url.startswith("postgres://"):
             database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-        connection = psycopg2.connect(database_url, sslmode="require")
+        try:
+            connection = psycopg2.connect(database_url, sslmode="require")
+        except Exception:
+            connection = psycopg2.connect(database_url)
     else:
         connection = psycopg2.connect(
             host=os.getenv("POSTGRES_HOST", "localhost"),

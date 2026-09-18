@@ -105,6 +105,13 @@ def seed_database():
                                     continue
                                 cur.execute(sql)
 
+        # Synchronize PostgreSQL sequences so new inserts don't collide with existing IDs
+        for table in ["users", "jobs", "candidate_profiles", "resumes", "swipe_history", "ats_reports"]:
+            try:
+                cur.execute(f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE(max(id), 1)) FROM {table};")
+            except Exception as seq_err:
+                print(f"[SEED] Sequence sync for {table}: {seq_err}")
+
         conn.commit()
         elapsed = time.time() - start_time
         print(f"[SEED] SUCCESS! Database seeded with 33,000+ jobs in {elapsed:.2f}s.")

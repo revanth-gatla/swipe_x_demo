@@ -260,3 +260,5 @@ backend/data/*.csv
 backend/data/job_postings.csv
 !backend/data/swipe_x_dump.sql.gz
 cloudflared.exe
+.vercel
+.env*
