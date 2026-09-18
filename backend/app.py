@@ -64,31 +64,39 @@ def startup_event():
                 );
                 CREATE TABLE IF NOT EXISTS jobs (
                     id SERIAL PRIMARY KEY,
-                    title VARCHAR(500),
-                    company VARCHAR(500),
+                    title VARCHAR(500) NOT NULL DEFAULT '',
+                    company VARCHAR(500) NOT NULL DEFAULT '',
                     location VARCHAR(500),
                     description TEXT,
+                    required_skills TEXT,
+                    experience_required NUMERIC(4,1) DEFAULT 0,
                     salary VARCHAR(255),
                     job_type VARCHAR(100),
+                    application_url TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    education_required TEXT,
+                    responsibilities TEXT,
+                    work_mode VARCHAR(100),
+                    source VARCHAR(100),
+                    source_job_id VARCHAR(100),
                     experience_level VARCHAR(100),
+                    remote_allowed BOOLEAN,
                     skills TEXT,
                     posted_date VARCHAR(100),
-                    application_url TEXT,
-                    source VARCHAR(100),
-                    work_mode VARCHAR(100),
                     industry VARCHAR(255),
                     company_size VARCHAR(100),
                     benefits TEXT
                 );
                 CREATE TABLE IF NOT EXISTS candidate_profiles (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                     phone VARCHAR(50),
                     location VARCHAR(255),
                     education TEXT,
                     experience_years FLOAT DEFAULT 0,
                     skills TEXT,
                     bio TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     preferred_roles TEXT,
                     preferred_locations TEXT,
                     career_interests TEXT,
@@ -96,26 +104,58 @@ def startup_event():
                 );
                 CREATE TABLE IF NOT EXISTS resumes (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
-                    filename VARCHAR(500),
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    file_name VARCHAR(500),
+                    file_path VARCHAR(500),
                     extracted_text TEXT,
+                    extracted_skills TEXT,
+                    extracted_experience TEXT,
                     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE TABLE IF NOT EXISTS swipe_history (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
-                    job_id INTEGER REFERENCES jobs(id),
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    job_id INTEGER REFERENCES jobs(id) ON DELETE CASCADE,
                     action VARCHAR(20),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE TABLE IF NOT EXISTS ats_reports (
                     id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    resume_id INTEGER,
                     job_id INTEGER,
+                    ats_score NUMERIC(5,2),
+                    matched_skills TEXT,
+                    missing_skills TEXT,
+                    suggestions TEXT,
                     score FLOAT,
                     feedback TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
+
+                -- Ensure columns exist if tables already created
+                ALTER TABLE jobs ADD COLUMN IF NOT EXISTS required_skills TEXT;
+                ALTER TABLE jobs ADD COLUMN IF NOT EXISTS experience_required NUMERIC(4,1) DEFAULT 0;
+                ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                ALTER TABLE jobs ADD COLUMN IF NOT EXISTS education_required TEXT;
+                ALTER TABLE jobs ADD COLUMN IF NOT EXISTS responsibilities TEXT;
+                ALTER TABLE jobs ADD COLUMN IF NOT EXISTS remote_allowed BOOLEAN;
+                ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_job_id VARCHAR(100);
+
+                ALTER TABLE candidate_profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+                ALTER TABLE resumes ADD COLUMN IF NOT EXISTS file_name VARCHAR(500);
+                ALTER TABLE resumes ADD COLUMN IF NOT EXISTS file_path VARCHAR(500);
+                ALTER TABLE resumes ADD COLUMN IF NOT EXISTS extracted_skills TEXT;
+                ALTER TABLE resumes ADD COLUMN IF NOT EXISTS extracted_experience TEXT;
+
+                ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS resume_id INTEGER;
+                ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS ats_score NUMERIC(5,2);
+                ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS matched_skills TEXT;
+                ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS missing_skills TEXT;
+                ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS suggestions TEXT;
+                ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
             """)
         conn.commit()
         conn.close()

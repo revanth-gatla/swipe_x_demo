@@ -66,11 +66,12 @@ def seed_database():
         print(f"[SEED] Seeding database from {DUMP_PATH.name} ({DUMP_PATH.stat().st_size / 1024 / 1024:.1f} MB compressed)...")
         start_time = time.time()
 
+        import tempfile
         with conn.cursor() as cur:
             with gzip.open(DUMP_PATH, "rt", encoding="utf-8", errors="ignore") as f:
                 in_copy = False
                 copy_stmt = None
-                copy_buffer = []
+                temp_file = None
                 stmt_buffer = []
 
                 for line in f:
@@ -79,19 +80,34 @@ def seed_database():
 
                     if in_copy:
                         if line.strip() == "\\.":
-                            # End of COPY block -> stream via copy_expert
+                            # End of COPY block -> stream via copy_expert from temp file
                             in_copy = False
-                            data_str = "".join(copy_buffer)
-                            cur.copy_expert(copy_stmt, io.StringIO(data_str))
-                            copy_buffer = []
+                            if temp_file:
+                                temp_file.flush()
+                                temp_file.seek(0)
+                                print(f"[SEED] Streaming {copy_stmt[:50]} to database...")
+                                try:
+                                    cur.copy_expert(copy_stmt, temp_file)
+                                except Exception as copy_err:
+                                    print(f"[SEED] COPY warning: {copy_err}")
+                                    conn.rollback()
+                                    conn.autocommit = False
+                                finally:
+                                    temp_file.close()
+                                    try:
+                                        os.unlink(temp_file.name)
+                                    except Exception:
+                                        pass
+                                    temp_file = None
                             copy_stmt = None
                         else:
-                            copy_buffer.append(line)
+                            if temp_file:
+                                temp_file.write(line)
                     else:
                         if line.upper().startswith("COPY ") and "FROM STDIN" in line.upper():
                             in_copy = True
-                            # Format statement for copy_expert: remove trailing semicolon
                             copy_stmt = line.strip().rstrip(";")
+                            temp_file = tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8", delete=False)
                         else:
                             stmt_buffer.append(line)
                             if line.strip().endswith(";"):
