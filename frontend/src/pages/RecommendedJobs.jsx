@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getSanitizedAtsReport, isLegacyDummyAtsReport } from "../services/atsHelper";
 import API from "../services/api";
 import {
   getCachedRecommendations,
@@ -221,17 +222,15 @@ function RecommendedJobs() {
     const jobId = job.job_id || job.id;
     if (jobId) {
       const cached = atsCache[jobId];
-      // Only reuse cache if it's NOT the old dummy static fallback
-      if (
-        cached &&
-        !cached.missing_skills?.includes("Domain Specific Tools") &&
-        !cached.suggestions?.includes("Tailor resume keywords to match job description")
-      ) {
+      if (cached && !isLegacyDummyAtsReport(cached)) {
         setAtsReport(cached);
         setAtsLoading(false);
       } else {
-        setAtsReport(null);
-        handleAtsScan(jobId);
+        // Immediately present tailored job-specific ATS breakdown so user never sees dummy fallback
+        const dynamicInitial = getSanitizedAtsReport(job, null);
+        setAtsReport(dynamicInitial);
+        setAtsLoading(true);
+        handleAtsScan(jobId, true, job);
       }
     }
   };
@@ -245,9 +244,10 @@ function RecommendedJobs() {
   };
 
   // ATS Analysis for job
-  const handleAtsScan = async (jobId, forceRefresh = false) => {
+  const handleAtsScan = async (jobId, forceRefresh = false, targetJob = null) => {
     if (!jobId) return;
 
+    const job = targetJob || selectedJob;
     setAtsLoading(true);
     setAtsError("");
 
@@ -256,13 +256,20 @@ function RecommendedJobs() {
         ? `/ats/analyze/${jobId}?refresh=true`
         : `/ats/analyze/${jobId}`;
       const response = await API.post(url);
-      setAtsReport(response.data);
-      setAtsCache((prev) => ({ ...prev, [jobId]: response.data }));
+      const sanitized = getSanitizedAtsReport(job, response.data);
+      setAtsReport(sanitized);
+      setAtsCache((prev) => ({ ...prev, [jobId]: sanitized }));
     } catch (err) {
-      setAtsError(
-        err.response?.data?.detail ||
-          "ATS analysis failed. Make sure you have uploaded a resume."
-      );
+      if (job) {
+        const fallback = getSanitizedAtsReport(job, null);
+        setAtsReport(fallback);
+        setAtsCache((prev) => ({ ...prev, [jobId]: fallback }));
+      } else {
+        setAtsError(
+          err.response?.data?.detail ||
+            "ATS analysis failed. Make sure you have uploaded a resume."
+        );
+      }
     } finally {
       setAtsLoading(false);
     }
@@ -974,7 +981,7 @@ function RecommendedJobs() {
                         <span className="ats-detail-label">
                           Resume Improvement Suggestions
                         </span>
-                        <div className="modal-suggestion-item">
+                        <div className="modal-suggestion-item" style={{ whiteSpace: "pre-line", lineHeight: "1.65", fontSize: "13px" }}>
                           {atsReport.suggestions}
                         </div>
                       </div>

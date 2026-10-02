@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { getSanitizedAtsReport, isLegacyDummyAtsReport } from "../services/atsHelper";
 import API from "../services/api";
 
 function DiscoverJobs() {
@@ -119,12 +120,13 @@ function DiscoverJobs() {
   const handleViewDetails = async (job) => {
     setSelectedJob(job);
     setLoadingDetails(true);
-    setAtsReport(null);
+    setAtsReport(getSanitizedAtsReport(job, null));
     setAtsError("");
 
     try {
       const res = await API.get(`/jobs/${job.id}`);
       setSelectedJob(res.data);
+      setAtsReport((prev) => getSanitizedAtsReport(res.data, prev));
     } catch (err) {
       console.error("Failed to load job details:", err);
     } finally {
@@ -181,12 +183,17 @@ function DiscoverJobs() {
     setAtsError("");
     try {
       const res = await API.post(`/ats/analyze/${jobId}?refresh=true`);
-      setAtsReport(res.data);
+      const sanitized = getSanitizedAtsReport(selectedJob, res.data);
+      setAtsReport(sanitized);
     } catch (err) {
-      setAtsError(
-        err.response?.data?.detail ||
-          "ATS analysis failed. Make sure you have uploaded a resume in the Resume section."
-      );
+      if (selectedJob) {
+        setAtsReport(getSanitizedAtsReport(selectedJob, null));
+      } else {
+        setAtsError(
+          err.response?.data?.detail ||
+            "ATS analysis failed. Make sure you have uploaded a resume in the Resume section."
+        );
+      }
     } finally {
       setAtsLoading(false);
     }
