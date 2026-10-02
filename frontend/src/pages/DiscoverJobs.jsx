@@ -180,7 +180,7 @@ function DiscoverJobs() {
     setAtsLoading(true);
     setAtsError("");
     try {
-      const res = await API.post(`/ats/analyze/${jobId}`);
+      const res = await API.post(`/ats/analyze/${jobId}?refresh=true`);
       setAtsReport(res.data);
     } catch (err) {
       setAtsError(
@@ -600,6 +600,27 @@ function DiscoverJobs() {
                                   + {s.trim()}
                                 </span>
                               ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {atsReport.suggestions && (
+                          <div className="ats-detail-block" style={{ marginTop: "14px" }}>
+                            <span className="ats-detail-label">Resume Improvement Suggestions</span>
+                            <div
+                              className="modal-suggestion-item"
+                              style={{
+                                padding: "12px 14px",
+                                borderRadius: "8px",
+                                background: "rgba(255,255,255,0.04)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                fontSize: "13px",
+                                lineHeight: "1.6",
+                                color: "#cbd5e1",
+                                whiteSpace: "pre-line"
+                              }}
+                            >
+                              {atsReport.suggestions}
                             </div>
                           </div>
                         )}

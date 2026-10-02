@@ -158,6 +158,7 @@ def startup_event():
                 ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS missing_skills TEXT;
                 ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS suggestions TEXT;
                 ALTER TABLE ats_reports ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+                DELETE FROM ats_reports WHERE missing_skills = 'Domain Specific Tools' OR suggestions LIKE '%Tailor resume keywords%';
 
                 -- Ensure core active users exist so tokens never violate foreign keys
                 INSERT INTO users (id, name, email, password) VALUES
@@ -2044,12 +2045,147 @@ def get_swipe_history(
 
 
 # ---------------------------------------------------------------------------
-# Job-Specific ATS Analysis
+# Job-Specific ATS Analysis (Dynamic & AI-Powered)
 # ---------------------------------------------------------------------------
+
+def _generate_dynamic_ats_analysis(
+    resume_text: str,
+    resume_skills: Any,
+    job_title: str,
+    job_company: str,
+    job_skills: str,
+    job_description: str,
+    job_experience: Any,
+    job_exp_level: str
+) -> dict:
+    """
+    Intelligent, dynamic ATS analysis:
+    Compares candidate resume skills & text against job requirements,
+    calculates real match ratios, detects missing keywords,
+    and formulates highly tailored, actionable resume recommendations.
+    """
+    candidate_skills = []
+    if isinstance(resume_skills, list):
+        candidate_skills = [str(s).strip() for s in resume_skills if str(s).strip()]
+    elif isinstance(resume_skills, str) and resume_skills.strip():
+        try:
+            parsed = json.loads(resume_skills)
+            if isinstance(parsed, list):
+                candidate_skills = [str(s).strip() for s in parsed if str(s).strip()]
+            else:
+                candidate_skills = [s.strip() for s in resume_skills.split(",") if s.strip()]
+        except Exception:
+            candidate_skills = [s.strip() for s in resume_skills.split(",") if s.strip()]
+
+    resume_full_lower = (resume_text or "").lower()
+
+    # Parse job required skills
+    raw_required = [s.strip() for s in (job_skills or "").split(",") if s.strip()]
+
+    # If job has few or no explicit required skills, extract tech terms from title and description
+    tech_keywords = [
+        "Python", "JavaScript", "TypeScript", "React", "ReactJS", "Node.js", "C#", ".NET", "ASP.NET",
+        "Java", "Spring Boot", "SQL", "PostgreSQL", "MySQL", "MongoDB", "AWS", "Azure", "GCP",
+        "Docker", "Kubernetes", "Git", "CI/CD", "REST API", "GraphQL", "Machine Learning", "AI",
+        "HTML", "CSS", "Tailwind", "Redux", "Kafka", "Redis", "Linux", "Microservices", "XML", "POS",
+        "Database Architecture", "Performance Tuning", "Replication", "High Availability"
+    ]
+    job_haystack = f"{job_title} {job_description}"
+    for tk in tech_keywords:
+        if len(raw_required) < 10 and re.search(r'\b' + re.escape(tk.lower()) + r'\b', job_haystack.lower()):
+            if not any(tk.lower() == r.lower() for r in raw_required):
+                raw_required.append(tk)
+
+    matched = []
+    missing = []
+
+    for req in raw_required:
+        clean_req = _clean_skill_label(req)
+        if not clean_req or len(clean_req) < 2:
+            continue
+        req_lower = clean_req.lower()
+
+        # Match against candidate skills
+        is_match = False
+        for cs in candidate_skills:
+            cs_lower = cs.lower().strip()
+            if not cs_lower:
+                continue
+            if req_lower == cs_lower or (len(cs_lower) >= 3 and req_lower in cs_lower) or (len(req_lower) >= 3 and cs_lower in req_lower):
+                is_match = True
+                break
+
+        # Match against full resume text
+        if not is_match and resume_full_lower:
+            if len(req_lower) <= 2:
+                if re.search(r'(?<![a-zA-Z0-9])' + re.escape(req_lower) + r'(?![a-zA-Z0-9])', resume_full_lower):
+                    is_match = True
+            else:
+                if re.search(r'\b' + re.escape(req_lower) + r'\b', resume_full_lower):
+                    is_match = True
+
+        display_name = clean_req.title() if len(clean_req) > 3 and not clean_req.isupper() else clean_req
+        if is_match:
+            if display_name not in matched:
+                matched.append(display_name)
+        else:
+            if display_name not in missing:
+                missing.append(display_name)
+
+    # 3. Dynamic ATS Score
+    total_req = len(matched) + len(missing)
+    if total_req > 0:
+        base_ratio = len(matched) / total_req
+        ats_score = round(max(15.0, min(95.0, (base_ratio * 70.0) + 18.0)), 1)
+    else:
+        ats_score = 65.0
+
+    # 4. Tailored Actionable Suggestions
+    sug_parts = []
+    company_name = job_company if job_company and job_company.lower() not in ["unknown", "none"] else "the employer"
+
+    if missing:
+        top_missing = ", ".join(f"'{m}'" for m in missing[:4])
+        sug_parts.append(
+            f"1. Target Missing Keywords: Explicitly integrate core missing keywords ({top_missing}) "
+            f"into your skills list and work experience bullet points to satisfy ATS scan criteria for {job_title}."
+        )
+
+    if matched:
+        top_matched = ", ".join(matched[:3])
+        sug_parts.append(
+            f"2. Quantify Core Alignment: You have strong alignment in {top_matched}. "
+            f"Elevate these competencies by adding quantifiable metrics (e.g., % latency reduced, scaling capacity, business impact) in your recent roles."
+        )
+    else:
+        sug_parts.append(
+            f"2. Bridge Skill Gaps: Emphasize adjacent engineering fundamentals, open-source projects, or specialized certifications related to {job_title} to demonstrate fast ramp-up potential."
+        )
+
+    exp_info = job_experience or job_exp_level
+    if exp_info and str(exp_info).lower() not in ["not specified", "unknown", "none", "0"]:
+        sug_parts.append(
+            f"3. Experience Framing: Calibrate your resume summary statement to reflect the {exp_info} level expected by {company_name}."
+        )
+    else:
+        sug_parts.append(
+            f"3. Resume Structure: Ensure your resume uses standard ATS-readable headings (Professional Experience, Technical Skills, Education) and clean bullet points without multi-column tables."
+        )
+
+    suggestions = "\n".join(sug_parts)
+
+    return {
+        "ats_score": ats_score,
+        "matched_skills": ", ".join(matched) if matched else "Foundational Engineering, Problem Solving",
+        "missing_skills": ", ".join(missing) if missing else "None — Strong Keyword Coverage",
+        "suggestions": suggestions
+    }
+
 
 @app.post("/ats/analyze/{job_id}")
 def analyze_ats(
     job_id: int,
+    refresh: bool = False,
     user_id: int = Depends(get_user_id)
 ):
     """
@@ -2086,7 +2222,7 @@ def analyze_ats(
         resume_skills = resume[2]
 
         if not resume_text:
-            resume_text = resume_skills or "Technical Profile: Machine Learning, Artificial Intelligence, Python, Google Cloud"
+            resume_text = resume_skills or "Technical Profile: Engineering, Software Development"
 
         # Get the job
         cursor.execute(
@@ -2130,19 +2266,29 @@ def analyze_ats(
         )
         cached = cursor.fetchone()
 
-        if cached:
-            return {
-                "ats_score": float(cached[0]) if cached[0] else 0,
-                "matched_skills": cached[1] or "",
-                "missing_skills": cached[2] or "",
-                "suggestions": cached[3] or "",
-                "cached": True,
-                "analyzed_at": str(cached[4]) if cached[4] else None,
-                "job_title": job_title,
-                "job_company": job_company,
-            }
+        if cached and not refresh:
+            cached_matched = (cached[1] or "").strip()
+            cached_missing = (cached[2] or "").strip()
+            cached_sug = (cached[3] or "").strip()
+            # Invalidate any stale legacy fallback dummy data
+            is_legacy_dummy = (
+                "Domain Specific Tools" in cached_missing
+                or "Tailor resume keywords to match job description" in cached_sug
+                or "Technical Skills, Problem Solving" in cached_matched
+            )
+            if not is_legacy_dummy and cached_missing and cached_sug:
+                return {
+                    "ats_score": float(cached[0]) if cached[0] else 0,
+                    "matched_skills": cached_matched,
+                    "missing_skills": cached_missing,
+                    "suggestions": cached_sug,
+                    "cached": True,
+                    "analyzed_at": str(cached[4]) if cached[4] else None,
+                    "job_title": job_title,
+                    "job_company": job_company,
+                }
 
-        # Build ATS analysis prompt
+        # Build ATS analysis prompt for LLM
         prompt = f"""
 You are an expert ATS (Applicant Tracking System) analyzer.
 
@@ -2162,6 +2308,7 @@ Description: {job_description[:2000]}
 
 === INSTRUCTIONS ===
 Analyze how well this resume matches this specific job.
+Identify real matching skills, real missing skills from the job requirements, and 2-3 specific tailored suggestions for tailoring this candidate's resume to this job.
 
 Return ONLY valid JSON in this exact format:
 {{
@@ -2173,7 +2320,7 @@ Return ONLY valid JSON in this exact format:
 """
 
         global client
-        if client is None:
+        if client is None and GROQ_API_KEY:
             try:
                 client = Groq(api_key=GROQ_API_KEY)
             except Exception:
@@ -2181,36 +2328,47 @@ Return ONLY valid JSON in this exact format:
 
         ats_data = None
         if client:
-            for model_name in ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "groq/compound-mini"]:
+            for model_name in ["qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"]:
                 try:
                     response = client.chat.completions.create(
                         model=model_name,
                         messages=[{"role": "user", "content": prompt}],
-                        temperature=0
+                        temperature=0.1
                     )
                     ai_result = response.choices[0].message.content
                     if ai_result and ai_result.strip():
                         ai_result = ai_result.strip()
-                        ai_result = re.sub(r"^```(?:json)?\s*", "", ai_result)
-                        ai_result = re.sub(r"\s*```\s*$", "", ai_result)
-                        ats_data = json.loads(ai_result)
-                        break
+                        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", ai_result, re.DOTALL)
+                        if m:
+                            ai_result = m.group(1)
+                        else:
+                            ai_result = re.sub(r"^```(?:json)?\s*", "", ai_result)
+                            ai_result = re.sub(r"\s*```\s*$", "", ai_result)
+                        parsed = json.loads(ai_result)
+                        if isinstance(parsed, dict) and (parsed.get("matched_skills") or parsed.get("missing_skills")):
+                            if "Domain Specific Tools" not in str(parsed.get("missing_skills", "")):
+                                ats_data = parsed
+                                break
                 except Exception as e:
                     print(f"[ATS] Model {model_name} failed: {e}")
                     continue
 
-        if not ats_data or not isinstance(ats_data, dict):
-            ats_data = {
-                "ats_score": 75.0,
-                "matched_skills": "Technical Skills, Problem Solving",
-                "missing_skills": "Domain Specific Tools",
-                "suggestions": "Tailor resume keywords to match job description."
-            }
+        if not ats_data or not isinstance(ats_data, dict) or not ats_data.get("missing_skills"):
+            ats_data = _generate_dynamic_ats_analysis(
+                resume_text=resume_text,
+                resume_skills=resume_skills,
+                job_title=job_title,
+                job_company=job_company,
+                job_skills=job_skills,
+                job_description=job_description,
+                job_experience=job_experience,
+                job_exp_level=job_exp_level
+            )
 
         ats_score = max(0, min(100, float(ats_data.get("ats_score", 0))))
-        matched_skills = str(ats_data.get("matched_skills", ""))
-        missing_skills = str(ats_data.get("missing_skills", ""))
-        suggestions = str(ats_data.get("suggestions", ""))
+        matched_skills = str(ats_data.get("matched_skills", "")).strip()
+        missing_skills = str(ats_data.get("missing_skills", "")).strip()
+        suggestions = str(ats_data.get("suggestions", "")).strip()
 
         # Upsert into ats_reports
         cursor.execute(
@@ -2300,12 +2458,24 @@ def get_ats_report(
         if not report:
             return {"report": None}
 
+        matched_s = (report[1] or "").strip()
+        missing_s = (report[2] or "").strip()
+        sug_s = (report[3] or "").strip()
+
+        # If it's the old static dummy data, invalidate it so fresh dynamic scan is triggered
+        if (
+            "Domain Specific Tools" in missing_s
+            or "Tailor resume keywords to match job description" in sug_s
+            or "Technical Skills, Problem Solving" in matched_s
+        ):
+            return {"report": None}
+
         return {
             "report": {
                 "ats_score": float(report[0]) if report[0] else 0,
-                "matched_skills": report[1] or "",
-                "missing_skills": report[2] or "",
-                "suggestions": report[3] or "",
+                "matched_skills": matched_s,
+                "missing_skills": missing_s,
+                "suggestions": sug_s,
                 "analyzed_at": str(report[4]) if report[4] else None,
                 "job_title": report[5],
                 "job_company": report[6],
@@ -2315,3 +2485,4 @@ def get_ats_report(
     finally:
         cursor.close()
         connection.close()
+

@@ -220,8 +220,14 @@ function RecommendedJobs() {
 
     const jobId = job.job_id || job.id;
     if (jobId) {
-      if (atsCache[jobId]) {
-        setAtsReport(atsCache[jobId]);
+      const cached = atsCache[jobId];
+      // Only reuse cache if it's NOT the old dummy static fallback
+      if (
+        cached &&
+        !cached.missing_skills?.includes("Domain Specific Tools") &&
+        !cached.suggestions?.includes("Tailor resume keywords to match job description")
+      ) {
+        setAtsReport(cached);
         setAtsLoading(false);
       } else {
         setAtsReport(null);
@@ -239,14 +245,17 @@ function RecommendedJobs() {
   };
 
   // ATS Analysis for job
-  const handleAtsScan = async (jobId) => {
+  const handleAtsScan = async (jobId, forceRefresh = false) => {
     if (!jobId) return;
 
     setAtsLoading(true);
     setAtsError("");
 
     try {
-      const response = await API.post(`/ats/analyze/${jobId}`);
+      const url = forceRefresh
+        ? `/ats/analyze/${jobId}?refresh=true`
+        : `/ats/analyze/${jobId}`;
+      const response = await API.post(url);
       setAtsReport(response.data);
       setAtsCache((prev) => ({ ...prev, [jobId]: response.data }));
     } catch (err) {
